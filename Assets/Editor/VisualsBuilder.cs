@@ -45,11 +45,14 @@ public static class VisualsBuilder
     {
         if (!OpenMainScene(out var scene)) return;
 
-        if (RebuildPrefab<AltitudeObject>("SkyPuff", CreateSkyPuffPrefab).Count == 0)
+        var decorSpawners = RebuildPrefab<AltitudeObject>("SkyPuff", CreateSkyPuffPrefab);
+        if (decorSpawners.Count == 0)
         {
             EditorUtility.DisplayDialog("No clouds yet", "Build Phase 3 first (it adds the background clouds).", "OK");
             return;
         }
+        foreach (ObstacleSpawner decor in decorSpawners)
+            SetFloat(decor, "prefillBelow", 60f); // sky starts full of clouds
 
         SaveScene(scene);
         Debug.Log("Cloud sprite applied. Press Play!");
@@ -74,6 +77,25 @@ public static class VisualsBuilder
         Debug.Log("Wheel sprite applied. Press Play!");
     }
 
+    // Just swaps the balloon art: milk jugs, coal balloons, and the pitstop (balloons + milk display) if built.
+    [MenuItem("Tools/Up Up Away/Build Balloon Sprite")]
+    public static void BuildBalloonsOnly()
+    {
+        if (!OpenMainScene(out var scene)) return;
+
+        if (RebuildPrefab<MilkJug>("MilkJug", CreateMilkJugPrefab).Count == 0)
+        {
+            EditorUtility.DisplayDialog("No milk jugs yet", "Build Phase 4 first (it adds the milk jugs).", "OK");
+            return;
+        }
+        RebuildPrefab<ResourceBalloon>("ResourceBalloon", CreateResourceBalloonPrefab);
+        if (Object.FindAnyObjectByType<PitstopManager>() != null && !Phase5SceneBuilder.AddToOpenScene())
+            return;
+
+        SaveScene(scene);
+        Debug.Log("Balloon sprite applied. Press Play!");
+    }
+
     // Also called by Build Art Style.
     public static void ApplyToOpenScene()
     {
@@ -84,10 +106,10 @@ public static class VisualsBuilder
         Furnace furnace = Object.FindAnyObjectByType<Furnace>();
         GameObject cabinZone = GameObject.Find("CabinZone");
 
-        // Cabin layout: wheel in the middle, furnace + coal on the left, everything standing on the floor.
+        // Cabin layout: wheel in the middle, furnace + coal on the right, everything standing on the floor.
         if (cabinZone != null) BuildCabinFloor(cabinZone.transform);
         if (wheel != null) wheel.transform.localPosition = new Vector3(0f, FloorTop + StandBaseBelowCenter, 0f); // stand rests on the floor
-        if (furnace != null) furnace.transform.localPosition = new Vector3(-5f, FloorTop + 1.32f, 0f);
+        if (furnace != null) furnace.transform.localPosition = new Vector3(5f, FloorTop + 1.32f, 0f);
 
         if (ship != null) BuildShip(ship);
         if (wheel != null) BuildWheel(wheel);
@@ -95,11 +117,13 @@ public static class VisualsBuilder
 
         RebuildPrefab<Bird>("Bird", CreateBirdPrefab);
         RebuildPrefab<MilkJug>("MilkJug", CreateMilkJugPrefab);
+        RebuildPrefab<ResourceBalloon>("ResourceBalloon", CreateResourceBalloonPrefab);
         foreach (ObstacleSpawner decor in RebuildPrefab<AltitudeObject>("SkyPuff", CreateSkyPuffPrefab))
         {
             // Clouds are bigger now, so space them out more.
             SetFloat(decor, "minSpacing", 12f);
             SetFloat(decor, "maxSpacing", 22f);
+            SetFloat(decor, "prefillBelow", 60f); // sky starts full of clouds
         }
     }
 
@@ -254,6 +278,66 @@ public static class VisualsBuilder
     }
 
     private const string CloudSpritePath = "Assets/Art/Sprites/cloud-pixelart.png";
+    private const string BalloonSpritePath = "Assets/Art/Sprites/balloon-pixelart.png";
+    private const string MilkBottleSpritePath = "Assets/Art/Sprites/milk-bottle-pixelart.png";
+    private const string CoalSpritePath = "Assets/Art/Sprites/coal-pixelart.png";
+
+    // The gray pixel-art balloon (with its string). Tint it any color.
+    public static Sprite BalloonSprite => LoadPixelSprite(BalloonSpritePath);
+
+    // Where the string ends, relative to the sprite's center, at scale 1 (123.5px below, 3.5px left).
+    public static readonly Vector2 BalloonStringEnd = new Vector2(-0.035f, -1.235f);
+
+    // Crops of the pixel art (rect = top-left x, y and size in the 256px image, as an image editor shows it).
+    // Cropped tight, so each is centered on its pivot and its size in units is just pixels / 100.
+
+    // Just the balloon + knot, without the string (which starts at y 174): for balloons tied with separate ropes.
+    public static Sprite BalloonBodySprite => CroppedPixelSprite(BalloonSpritePath, "balloon-body", 103, 118, 48, 56);
+    public const float BalloonBodyWidth = 0.48f, BalloonBodyHeight = 0.56f;
+
+    public static Sprite MilkBottleSprite => CroppedPixelSprite(MilkBottleSpritePath, "milk-bottle", 93, 43, 68, 133);
+    public const float MilkBottleScale = 0.45f; // 0.31 x 0.6 units on screen
+    public const float MilkBottleHalfHeight = 1.33f / 2f * MilkBottleScale;
+
+    public static Sprite CoalSprite => CroppedPixelSprite(CoalSpritePath, "coal-lump", 106, 94, 51, 48);
+    public const float CoalWidth = 0.51f;
+
+    // Saved under Assets/Art/Generated. It references the image, so repainting it updates the crop too.
+    // If the rect changes, the saved sprite is updated in place, so everything pointing at it stays linked.
+    private static Sprite CroppedPixelSprite(string sourcePath, string name, int x, int y, int width, int height)
+    {
+        Sprite full = LoadPixelSprite(sourcePath);
+        if (full == null)
+            return null;
+        var crop = new Rect(x, full.texture.height - y - height, width, height); // textures count y from the bottom
+
+        string path = $"Assets/Art/Generated/{name}.asset";
+        var existing = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        if (existing != null && existing.rect == crop)
+            return existing;
+
+        Sprite sprite = Sprite.Create(full.texture, crop, new Vector2(0.5f, 0.5f), 100f);
+        sprite.name = name;
+        if (existing != null)
+        {
+            EditorUtility.CopySerialized(sprite, existing);
+            existing.name = name;
+            EditorUtility.SetDirty(existing);
+            AssetDatabase.SaveAssets();
+            return existing;
+        }
+        if (!AssetDatabase.IsValidFolder("Assets/Art/Generated"))
+            AssetDatabase.CreateFolder("Assets/Art", "Generated");
+        AssetDatabase.CreateAsset(sprite, path);
+        return sprite;
+    }
+
+    // A pixel-art coal lump `width` units across. Single sprite centered on its pivot (the coal pile throws copies).
+    public static GameObject CoalLump(Transform parent, string name, int order, Vector2 position, float width, bool flip)
+    {
+        float scale = width / CoalWidth;
+        return Part(parent, name, CoalSprite, Color.white, order, position, new Vector2(flip ? -scale : scale, scale));
+    }
 
     // A single-image sprite, imported crisp for pixel art.
     private static Sprite LoadPixelSprite(string path)
@@ -384,7 +468,7 @@ public static class VisualsBuilder
         Transform parent = furnace.transform.parent;
         DestroyChild(parent, "CoalPile");
 
-        Vector3 pilePosition = furnace.transform.localPosition + new Vector3(-2.4f, -1.05f, 0f);
+        Vector3 pilePosition = furnace.transform.localPosition + new Vector3(2.4f, -1.05f, 0f); // outer side of the furnace
         Transform pile = Container(parent, "CoalPile", pilePosition);
 
         // Pyramid of lumps, bottom row first. Fixed seed so it looks the same every rebuild.
@@ -398,9 +482,7 @@ public static class VisualsBuilder
                 float x = (i - (rows[row] - 1) / 2f) * 0.36f + (float)(random.NextDouble() - 0.5) * 0.06f;
                 float y = row * 0.27f;
                 float size = 0.36f + (float)random.NextDouble() * 0.1f;
-                float shade = 0.1f + (float)random.NextDouble() * 0.08f;
-                lumps.Add(Part(pile, $"Lump{lumps.Count}", circle, new Color(shade, shade, shade + 0.01f), 6,
-                    new Vector2(x, y), new Vector2(size, size * 0.85f), (float)random.NextDouble() * 360f));
+                lumps.Add(CoalLump(pile, $"Lump{lumps.Count}", 6, new Vector2(x, y), size, random.NextDouble() < 0.5));
             }
         }
 
@@ -482,15 +564,12 @@ public static class VisualsBuilder
     {
         LoadSprites();
 
-        Part(t, "Body", square, new Color(0.97f, 0.97f, 0.95f), 4 + orderOffset, Vector2.zero, new Vector2(0.3f, 0.45f));
-        Part(t, "Cap", square, new Color(0.2f, 0.45f, 0.9f), 5 + orderOffset, new Vector2(0f, 0.2475f), new Vector2(0.18f, 0.09f));
+        Part(t, "Bottle", MilkBottleSprite, Color.white, 4 + orderOffset, Vector2.zero, new Vector2(MilkBottleScale, MilkBottleScale));
 
-        // Balloon, pivoting at the cap so it sways.
-        Transform balloon = Container(t, "Balloon", new Vector2(0f, 0.29f));
-        Part(balloon, "String", square, new Color(0.35f, 0.3f, 0.25f), 3 + orderOffset, new Vector2(0f, 0.2f), new Vector2(0.025f, 0.4f));
-        GameObject knot = Part(balloon, "Knot", square, Color.white, 4 + orderOffset, new Vector2(0f, 0.42f), new Vector2(0.08f, 0.08f), 45f);
-        GameObject body = Part(balloon, "BalloonBody", circle, Color.white, 4 + orderOffset, new Vector2(0f, 0.7f), new Vector2(0.48f, 0.58f));
-        Part(balloon, "Shine", circle, new Color(1f, 1f, 1f, 0.6f), 5 + orderOffset, new Vector2(-0.1f, 0.8f), new Vector2(0.1f, 0.16f), 20f);
+        // Balloon, pivoting at the cork so it sways. Pixel art in grays: the tint colors the balloon, the black string stays black.
+        // The image's string ends 123.5px below and 3.5px left of its center, so offset it to end right at the cork.
+        Transform balloon = Container(t, "Balloon", new Vector2(0f, MilkBottleHalfHeight));
+        GameObject body = Part(balloon, "BalloonBody", BalloonSprite, Color.white, 4 + orderOffset, -BalloonStringEnd, Vector2.one);
 
         var sway = balloon.gameObject.AddComponent<Flapper>();
         var swaySo = new SerializedObject(sway);
@@ -502,9 +581,8 @@ public static class VisualsBuilder
         var look = balloon.gameObject.AddComponent<RandomLook>();
         var lookSo = new SerializedObject(look);
         SerializedProperty targets = lookSo.FindProperty("tintTargets");
-        targets.arraySize = 2;
+        targets.arraySize = 1;
         targets.GetArrayElementAtIndex(0).objectReferenceValue = body.GetComponent<SpriteRenderer>();
-        targets.GetArrayElementAtIndex(1).objectReferenceValue = knot.GetComponent<SpriteRenderer>();
         SetColors(lookSo.FindProperty("palette"), JugBalloonColors);
         lookSo.ApplyModifiedPropertiesWithoutUndo();
 
@@ -518,13 +596,53 @@ public static class VisualsBuilder
 
         var collider = go.AddComponent<BoxCollider2D>();
         collider.isTrigger = true;
-        collider.size = new Vector2(0.3f, 0.45f); // just the jug, so clicking it once attached is precise
+        collider.size = new Vector2(0.68f, 1.33f) * MilkBottleScale; // just the bottle, so clicking it once attached is precise
         go.AddComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Kinematic;
 
         MilkJug jug = go.AddComponent<MilkJug>();
         Assign(jug, "balloon", balloon.gameObject);
         SetFloat(jug, "driftSpeed", 0.5f); // floats up gently
         return SavePrefab(go).GetComponent<MilkJug>();
+    }
+
+    // ---------- Coal balloon ----------
+
+    // A red balloon carrying a crate of coal. Also used by the Phase 4 builder.
+    public static ResourceBalloon CreateResourceBalloonPrefab()
+    {
+        LoadSprites();
+
+        var go = new GameObject("ResourceBalloon");
+        Transform t = go.transform;
+
+        // Crate (sliced plank) with a brace and coal heaped on top.
+        const float crateY = -0.75f;
+        var crateSize = new Vector2(0.62f, 0.46f);
+        GameObject crate = Part(t, "Crate", ArtStyleAssets.WoodPlank, ArtPalette.Wood, 3, new Vector2(0f, crateY), Vector2.one);
+        var crateRenderer = crate.GetComponent<SpriteRenderer>();
+        crateRenderer.drawMode = SpriteDrawMode.Sliced;
+        crateRenderer.size = crateSize;
+        Part(t, "Brace", square, ArtPalette.WithAlpha(ArtPalette.Ink, 0.7f), 4, new Vector2(0f, crateY), new Vector2(0.55f, 0.05f), -30f);
+
+        float crateTop = crateY + crateSize.y / 2f;
+        (float x, float size)[] lumps = { (-0.16f, 0.22f), (0.15f, 0.2f), (0f, 0.25f) };
+        for (int i = 0; i < lumps.Length; i++)
+            CoalLump(t, "Coal" + i, 2, new Vector2(lumps[i].x, crateTop + 0.06f), lumps[i].size, i == 1); // behind the crate's front edge
+
+        // Balloon: red so it stands out from the milk balloons; its string ends at the crate top.
+        const float balloonScale = 1.4f;
+        Part(t, "Balloon", BalloonSprite, ArtPalette.Signal, 3,
+            new Vector2(0f, crateTop) - BalloonStringEnd * balloonScale, new Vector2(balloonScale, balloonScale));
+
+        var collider = go.AddComponent<BoxCollider2D>();
+        collider.isTrigger = true;
+        collider.size = new Vector2(0.8f, 2.4f); // crate bottom to balloon top
+        collider.offset = new Vector2(0f, 0.2f);
+        go.AddComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Kinematic;
+
+        ResourceBalloon balloon = go.AddComponent<ResourceBalloon>();
+        SetFloat(balloon, "driftSpeed", 1.5f);
+        return SavePrefab(go).GetComponent<ResourceBalloon>();
     }
 
     // ---------- Background clouds ----------

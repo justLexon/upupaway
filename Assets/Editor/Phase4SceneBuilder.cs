@@ -48,9 +48,6 @@ public static class Phase4SceneBuilder
             return false;
         }
 
-        Sprite square = SquareSprite();
-        Sprite circle = GetOrCreateCircleSprite();
-
         // Jug slots along the ship's bottom edge (local units; the ship is scaled 2x wide).
         var slotsRoot = new GameObject("JugSlots").transform;
         slotsRoot.SetParent(ship.transform, false);
@@ -68,7 +65,7 @@ public static class Phase4SceneBuilder
 
         // Prefabs + spawner mix
         MilkJug jugPrefab = VisualsBuilder.CreateMilkJugPrefab();
-        ResourceBalloon balloonPrefab = CreateBalloonPrefab(square, circle);
+        ResourceBalloon balloonPrefab = VisualsBuilder.CreateResourceBalloonPrefab();
         Bird birdPrefab = AssetDatabase.LoadAssetAtPath<Bird>(PrefabFolder + "/Bird.prefab");
 
         SetSpawnEntries(obstacleSpawner, (birdPrefab, 40f), (jugPrefab, 35f), (balloonPrefab, 25f));
@@ -101,32 +98,6 @@ public static class Phase4SceneBuilder
             }
         }
         return null;
-    }
-
-    private static ResourceBalloon CreateBalloonPrefab(Sprite square, Sprite circle)
-    {
-        GameObject go = CreateSprite("ResourceBalloon", circle, new Color(0.9f, 0.25f, 0.3f), 3);
-        go.transform.localScale = new Vector3(0.8f, 0.8f, 1f);
-
-        GameObject rope = CreateSprite("Rope", square, new Color(0.3f, 0.25f, 0.2f), 2);
-        rope.transform.SetParent(go.transform, false);
-        rope.transform.localPosition = new Vector3(0f, -0.6f, 0f);
-        rope.transform.localScale = new Vector3(0.05f, 0.4f, 1f);
-
-        GameObject crate = CreateSprite("Crate", square, new Color(0.55f, 0.35f, 0.15f), 3);
-        crate.transform.SetParent(go.transform, false);
-        crate.transform.localPosition = new Vector3(0f, -0.95f, 0f);
-        crate.transform.localScale = new Vector3(0.6f, 0.5f, 1f);
-
-        var collider = go.AddComponent<BoxCollider2D>();
-        collider.isTrigger = true;
-        collider.size = new Vector2(1f, 1.75f);
-        collider.offset = new Vector2(0f, -0.35f);
-        go.AddComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Kinematic;
-
-        ResourceBalloon balloon = go.AddComponent<ResourceBalloon>();
-        SetFloat(balloon, "driftSpeed", 1.5f);
-        return SavePrefab(go).GetComponent<ResourceBalloon>();
     }
 
 }

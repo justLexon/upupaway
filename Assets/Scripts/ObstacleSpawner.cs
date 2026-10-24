@@ -18,6 +18,7 @@ public class ObstacleSpawner : MonoBehaviour
     [SerializeField] private float minSpacing = 20f; // meters between spawns
     [SerializeField] private float maxSpacing = 40f;
     [SerializeField] private float xLimit = 7f;
+    [SerializeField] private float prefillBelow = 0f; // > 0: at start, also fill the sky from this many meters below the ship (decor clouds)
 
     [Header("Pity rule (optional): force a coal balloon when the player is low")]
     [SerializeField] private AltitudeObject pityPrefab;
@@ -30,6 +31,13 @@ public class ObstacleSpawner : MonoBehaviour
     private void Start()
     {
         nextSpawnAltitude = ship.Altitude + spawnAhead;
+
+        // Start with the screen already populated instead of an empty sky.
+        if (prefillBelow > 0f)
+        {
+            for (float altitude = ship.Altitude - prefillBelow; altitude < nextSpawnAltitude; altitude += Random.Range(minSpacing, maxSpacing))
+                Spawn(altitude);
+        }
     }
 
     private void Update()

@@ -25,6 +25,9 @@ public class WindGusts : MonoBehaviour
     public float StrengthMultiplier { get; set; } = 1f;
     public float FrequencyMultiplier { get; set; } = 1f;
 
+    // Fired when a gust starts, with its strength from 0 (weakest) to 1 (strongest calm-weather gust; storms go higher).
+    public event System.Action<float> OnGust;
+
     private float nextGustTime;
     private float gustStart;
     private float gustDuration;
@@ -80,6 +83,7 @@ public class WindGusts : MonoBehaviour
         gustDuration = Random.Range(durationRange.x, durationRange.y);
         gustStrength = Random.Range(strengthRange.x, strengthRange.y) * StrengthMultiplier * (Random.value < 0.5f ? -1f : 1f);
         gustVertical = Random.Range(-maxVerticalPush, maxVerticalPush);
+        OnGust?.Invoke(Mathf.Abs(gustStrength) / strengthRange.y);
     }
 
     private void CreateStreaks()

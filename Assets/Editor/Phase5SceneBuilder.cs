@@ -142,7 +142,7 @@ public static class Phase5SceneBuilder
     private static GameObject CreateMilkDisplay()
     {
         var go = new GameObject("MilkDisplay");
-        Transform art = Container(go.transform, "Jug", new Vector2(0f, 0.225f)); // jug stands on the deck
+        Transform art = Container(go.transform, "Jug", new Vector2(0f, VisualsBuilder.MilkBottleHalfHeight)); // bottle stands on the deck
         VisualsBuilder.BuildMilkJugArt(art, Order + 2 - 4, unscaledSway: true);
         return SaveShopPrefab(go);
     }
@@ -160,12 +160,9 @@ public static class Phase5SceneBuilder
         {
             (-0.3f, 0.66f, 0.28f), (0f, 0.68f, 0.3f), (0.3f, 0.66f, 0.27f), (-0.15f, 0.84f, 0.26f), (0.15f, 0.84f, 0.25f),
         };
+        // Behind the crate's front edge, so the coal looks heaped inside it.
         for (int i = 0; i < lumps.Length; i++)
-        {
-            float shade = 0.1f + i * 0.015f;
-            Part(t, "Lump" + i, circle, new Color(shade, shade, shade + 0.01f), Order + 3,
-                new Vector2(lumps[i].x, lumps[i].y), new Vector2(lumps[i].size, lumps[i].size * 0.85f), i * 40f);
-        }
+            VisualsBuilder.CoalLump(t, "Lump" + i, Order + 2, new Vector2(lumps[i].x, lumps[i].y), lumps[i].size, i % 2 == 1);
         return SaveShopPrefab(go);
     }
 
@@ -206,17 +203,19 @@ public static class Phase5SceneBuilder
         Transform root = Container(outsideZone, "PitstopStation", new Vector2(16f, 0f)); // starts off screen
         const float deckTop = -1.35f;
 
-        // Balloons holding the market up (same style as the milk balloons).
-        (Vector2 pos, Vector2 size, Color color)[] balloons =
+        // Balloons holding the market up: the pixel-art milk balloon (without its string), tied with ropes.
+        Sprite balloonSprite = VisualsBuilder.BalloonBodySprite;
+        (Vector2 pos, float width, Color color)[] balloons =
         {
-            (new Vector2(-2.7f, 2.3f), new Vector2(1.3f, 1.5f), new Color(0.25f, 0.55f, 0.95f)),
-            (new Vector2(0f, 2.8f), new Vector2(1.5f, 1.75f), new Color(1f, 0.85f, 0.25f)),
-            (new Vector2(2.5f, 2.25f), new Vector2(1.2f, 1.4f), new Color(1f, 0.5f, 0.75f)),
+            (new Vector2(-2.7f, 2.3f), 1.3f, new Color(0.25f, 0.55f, 0.95f)),
+            (new Vector2(0f, 2.8f), 1.5f, new Color(1f, 0.85f, 0.25f)),
+            (new Vector2(2.5f, 2.25f), 1.2f, new Color(1f, 0.5f, 0.75f)),
         };
         for (int i = 0; i < balloons.Length; i++)
         {
-            var (pos, size, color) = balloons[i];
-            float bottom = pos.y - size.y / 2f;
+            var (pos, width, color) = balloons[i];
+            float scale = width / VisualsBuilder.BalloonBodyWidth;
+            float bottom = pos.y - VisualsBuilder.BalloonBodyHeight / 2f * scale;
             if (i == 1)
             {
                 // Middle balloon: two lines, with the Set Sail sign hanging between them.
@@ -227,10 +226,7 @@ public static class Phase5SceneBuilder
             {
                 StringLine(root, "String" + i, new Vector2(pos.x, deckTop), bottom);
             }
-            Part(root, "Balloon" + i, circle, color, Order + 1, pos, size);
-            Part(root, "Knot" + i, square, color, Order + 1, new Vector2(pos.x, bottom), new Vector2(0.14f, 0.14f), 45f);
-            Part(root, "Shine" + i, circle, new Color(1f, 1f, 1f, 0.55f), Order + 2,
-                pos + new Vector2(-size.x * 0.22f, size.y * 0.18f), new Vector2(size.x * 0.2f, size.y * 0.28f), 20f);
+            Part(root, "Balloon" + i, balloonSprite, color, Order + 1, pos, new Vector2(scale, scale));
         }
         WorldText(root, "Banner", "PITSTOP", new Vector2(0f, 2.8f), new Vector2(1.3f, 0.45f), ArtPalette.Ink, Order + 3, 4f, displayFont);
 

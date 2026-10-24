@@ -10,13 +10,21 @@ public class SteeringWheel : MonoBehaviour, IClickable
     // -1 = full left, +1 = full right
     public float SteerInput => -angle / maxAngle;
 
+    // How fast the wheel is spinning, in degrees per second (for the turning sound).
+    public float TurnSpeed { get; private set; }
+
     private float angle;
     private bool held;
 
     private void Update()
     {
         if (GameManager.Instance != null && (GameManager.Instance.IsGameOver || GameManager.Instance.IsPaused))
+        {
+            TurnSpeed = 0f;
             return;
+        }
+
+        float previousAngle = angle;
 
         // Mouse delta is already per frame, so it isn't scaled by deltaTime.
         if (held && Mouse.current != null)
@@ -26,6 +34,7 @@ public class SteeringWheel : MonoBehaviour, IClickable
 
         angle = Mathf.Clamp(angle, -maxAngle, maxAngle);
         transform.localRotation = Quaternion.Euler(0f, 0f, angle);
+        TurnSpeed = Time.deltaTime > 0f ? Mathf.Abs(angle - previousAngle) / Time.deltaTime : 0f;
     }
 
     public void OnPress()
