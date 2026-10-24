@@ -14,6 +14,8 @@ public class MilkJug : Obstacle, IClickable
     private ShipController owner;
     private Coroutine wobbleRoutine;
 
+    public bool IsAttached => attached;
+
     protected override void OnHitShip(ShipController ship)
     {
         if (!ship.TryGetFreeSlot(out Transform slot))
@@ -59,6 +61,18 @@ public class MilkJug : Obstacle, IClickable
 
     public void OnRelease()
     {
+    }
+
+    public bool SellAtShop()
+    {
+        if (!attached || owner == null)
+            return false;
+
+        attached = false;
+        owner.RemoveWeight(weightPerJug);
+        GetComponent<Collider2D>().enabled = false;
+        Destroy(gameObject);
+        return true;
     }
 
     private void KnockOff()

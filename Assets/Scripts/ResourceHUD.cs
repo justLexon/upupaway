@@ -17,7 +17,7 @@ public class ResourceHUD : MonoBehaviour
     private void Update()
     {
         int coal = ResourceManager.Instance.Coal;
-        coalText.text = $"Coal: {coal}";
+        coalText.text = $"Coal: {coal}  Coins: {ResourceManager.Instance.Coins}";
         coalText.color = coal <= lowCoal ? lowTextColor : normalTextColor;
 
         heatFill.anchorMax = new Vector2(furnace.Heat01, 1f);

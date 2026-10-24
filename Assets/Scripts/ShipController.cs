@@ -24,6 +24,19 @@ public class ShipController : MonoBehaviour
 
     // Extra sink in m/s from milk jugs.
     public float Weight { get; private set; }
+    public int AttachedMilkCount
+    {
+        get
+        {
+            int count = 0;
+            foreach (MilkJug jug in GetComponentsInChildren<MilkJug>())
+            {
+                if (jug.IsAttached)
+                    count++;
+            }
+            return count;
+        }
+    }
 
     // Set by WindGusts. x = world units/s sideways, y = m/s up/down.
     public Vector2 WindPush { get; set; }
@@ -84,6 +97,17 @@ public class ShipController : MonoBehaviour
     public void RemoveWeight(float amount)
     {
         Weight = Mathf.Max(0f, Weight - amount);
+    }
+
+    public int SellAttachedMilk()
+    {
+        int sold = 0;
+        foreach (MilkJug jug in GetComponentsInChildren<MilkJug>())
+        {
+            if (jug.SellAtShop())
+                sold++;
+        }
+        return sold;
     }
 
     public bool TryGetFreeSlot(out Transform slot)

@@ -86,6 +86,9 @@ public static class Phase4SceneBuilder
         Assign(gameManager, "ship", ship);
         Assign(gameManager, "resultText", resultText);
 
+        if (gameManager.GetComponent<ShopManager>() == null)
+            gameManager.gameObject.AddComponent<ShopManager>();
+
         return true;
     }
 

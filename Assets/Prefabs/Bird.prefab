@@ -304,8 +304,10 @@ MonoBehaviour:
   despawnBelow: 80
   despawnAbove: 150
   knockbackMeters: 15
-  wobbleAmplitude: 0.5
-  wobbleFrequency: 1.5
+  speedRange: {x: 1.2, y: 5.5}
+  xEdge: 8.5
+  maxClimbSpeed: 8
+  wanderFrequency: 0.5
 --- !u!1 &3602543319981081735
 GameObject:
   m_ObjectHideFlags: 0
