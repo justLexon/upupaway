@@ -30,16 +30,17 @@ public class ClickInput : MonoBehaviour
         Vector3 worldPoint = Camera.main.ScreenToWorldPoint(pointer);
         worldPoint.z = 0f;
 
-        Collider2D hit = Physics2D.OverlapPoint(worldPoint);
-        if (hit == null)
-            return;
+        // Check every collider under the mouse, so e.g. the ship's collider can't hide a milk jug.
+        foreach (Collider2D hit in Physics2D.OverlapPointAll(worldPoint))
+        {
+            var clickable = hit.GetComponentInParent<IClickable>();
+            if (clickable == null)
+                continue;
 
-        var clickable = hit.GetComponentInParent<IClickable>();
-        if (clickable == null)
+            held = clickable;
+            held.OnPress();
             return;
-
-        held = clickable;
-        held.OnPress();
+        }
     }
 
     private void Release()

@@ -1,12 +1,17 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour
 {
+    private const string BestAltitudeKey = "BestAltitude";
+
     public static GameManager Instance { get; private set; }
 
     [SerializeField] private GameObject gameOverPanel;
+    [SerializeField] private ShipController ship;
+    [SerializeField] private TMP_Text resultText;
 
     public bool IsGameOver { get; private set; }
 
@@ -28,6 +33,15 @@ public class GameManager : MonoBehaviour
         if (IsGameOver) return;
         IsGameOver = true;
         Time.timeScale = 0f;
+        Cursor.lockState = CursorLockMode.None;
         gameOverPanel.SetActive(true);
+
+        if (ship == null || resultText == null)
+            return;
+
+        float best = Mathf.Max(PlayerPrefs.GetFloat(BestAltitudeKey, 0f), ship.MaxAltitude);
+        PlayerPrefs.SetFloat(BestAltitudeKey, best);
+        PlayerPrefs.Save();
+        resultText.text = $"Peak altitude: {ship.MaxAltitude:N0} m\nBest: {best:N0} m";
     }
 }
