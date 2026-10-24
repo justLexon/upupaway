@@ -7,7 +7,7 @@
 **Not in this phase:** steering, obstacles, milk jugs, balloons, the altitude meter UI.
 
 **Done when:**
-- [ ] Scroll wheel (and W/S or Up/Down) moves the camera between the outside and the cabin, smoothly but fast
+- [ ] Scroll wheel (and W/S or Up/Down) fades the whole screen briefly while switching between the outside and cabin
 - [ ] In the outside view, a PiP rect at the **bottom** of the screen shows the cabin live
 - [ ] In the cabin view, a PiP rect at the **top** of the screen shows the outside live
 - [ ] Clicking the furnace adds coal; Space no longer does
@@ -35,18 +35,21 @@ y = -50   ── CABIN ZONE ────  Cabin background, Furnace, (later) Whe
 
 - `CameraSwitcher` has two target Y positions (outside = 0, cabin = -50).
 - Input: scroll down / S / Down Arrow goes to the cabin; scroll up / W / Up Arrow goes to the outside.
-- Movement: `Vector3.SmoothDamp` with `smoothTime ≈ 0.15`.
-- It exposes `CurrentView` (an `Outside` / `Cabin` enum) and an `OnViewChanged` event so the PiP (and later the UI) can react.
+- The full-screen transition overlay fades to black, then the main camera and PiP jump to their new positions while obscured, and the screen fades back in. Keep this transition short (about 0.26 seconds total).
+- The camera's projection and rendering settings do not change during a view switch; only its Y position changes while the screen is fully covered.
+- It exposes `CurrentView` (an `Outside` / `Cabin` enum) and an `OnViewChanged` event so the PiP (and later the UI) can react after the screen is covered.
 - It uses **unscaled** time, so it still works on the game over screen.
 
 ### PiP (picture-in-picture)
 
 - **PipCamera:** a second orthographic camera, same size as the main camera, rendering to a **Render Texture** (`PipTexture`, 640×360).
 - **PipView:** a UI `RawImage` on the Canvas showing `PipTexture`, about 480×270, with a thin border (an `Image` behind it, slightly larger).
+- **TransitionFade:** a full-screen black UI `RawImage`, last in the Canvas draw order, whose alpha is controlled by `CameraSwitcher`.
 - When the view changes:
+  - The screen fades fully to black.
   - Outside view: the PipCamera moves to the cabin (y = -50) and the rect anchors to the **bottom-center**.
   - Cabin view: the PipCamera moves to the outside (y = 0) and the rect anchors to the **top-center**.
-- Switch the PiP when the main camera **passes the halfway point**, not on input, so the PiP never shows the zone you're already looking at mid-scroll.
+  - The screen fades back in after both cameras and the PiP layout have updated.
 - **Bonus (cheap):** clicking the PiP rect switches to that view.
 
 ### Click system
@@ -99,7 +102,8 @@ Canvas
 ├── DebugText
 ├── PipFrame             (Image, dark border)
 │   └── PipView          (RawImage, texture = PipTexture, + PipClickToSwitch)
-└── GameOverPanel
+├── GameOverPanel
+└── TransitionFade       (full-screen black RawImage, alpha controlled by CameraSwitcher)
 EventSystem
 ```
 
@@ -113,38 +117,10 @@ EventSystem
 |---|---|---|
 | `IClickable.cs` | New | The interface above |
 | `ClickInput.cs` | New | Mouse → world raycast → `OnPress`/`OnRelease` |
-| `CameraSwitcher.cs` | New | View state, input, SmoothDamp, `OnViewChanged` event |
+| `CameraSwitcher.cs` | New | View input/state, brief full-screen fade, hidden camera reposition, `OnViewChanged` event |
 | `PipController.cs` | New | Listens to `OnViewChanged`; moves the PipCamera and re-anchors the PiP rect |
 | `PipClickToSwitch.cs` | New (bonus) | `IPointerClickHandler` on the RawImage → `CameraSwitcher.ToggleView()` |
 | `Furnace.cs` | Changed | Remove Space input; implement `IClickable`; heat color |
-
-#### `CameraSwitcher` sketch
-
-```csharp
-public enum View { Outside, Cabin }
-
-[SerializeField] private float outsideY = 0f;
-[SerializeField] private float cabinY = -50f;
-[SerializeField] private float smoothTime = 0.15f;
-
-public View CurrentView { get; private set; } = View.Outside; // flips at the halfway point
-public event System.Action<View> OnViewChanged;
-
-private View targetView = View.Outside;
-private float velocity;
-
-private void Update()
-{
-    // Read input: Mouse.current.scroll.ReadValue().y (< 0 = cabin, > 0 = outside), W/S, Up/Down
-    float targetY = targetView == View.Outside ? outsideY : cabinY;
-    Vector3 p = transform.position;
-    p.y = Mathf.SmoothDamp(p.y, targetY, ref velocity, smoothTime, Mathf.Infinity, Time.unscaledDeltaTime);
-    transform.position = p;
-
-    View visible = p.y > (outsideY + cabinY) / 2f ? View.Outside : View.Cabin;
-    if (visible != CurrentView) { CurrentView = visible; OnViewChanged?.Invoke(visible); }
-}
-```
 
 #### `PipController` sketch
 
@@ -171,10 +147,10 @@ Extend `Phase1SceneBuilder` (or add `Phase2SceneBuilder`) to add the zones, PipC
 
 ## Test
 
-1. Scroll down: the camera glides to the cabin in about 0.2s. The PiP at the top shows the ship and clouds moving live.
-2. Scroll up: you're back outside. The PiP at the bottom shows the cabin and the furnace glowing.
+1. Scroll down: the screen briefly fades to black, then reveals the cabin. The PiP at the top shows the ship and clouds live.
+2. Scroll up: the screen briefly fades to black, then reveals outside. The PiP at the bottom shows the cabin and the furnace glowing.
 3. Click the furnace in the cabin: coal goes down and heat goes up. Space does nothing.
-4. Spam scroll in both directions: no jitter, and the PiP never shows the zone you're in.
+4. Spam scroll in both directions: no camera motion is visible under the fade and the PiP always shows the opposite zone.
 5. Clicking on the PiP or debug text doesn't click through to the world.
 6. Game over still works, and R restarts.
 
@@ -182,7 +158,7 @@ Extend `Phase1SceneBuilder` (or add `Phase2SceneBuilder`) to add the zones, PipC
 - **PiP is black:** the PipCamera's Target Texture isn't set, or the RawImage texture isn't set.
 - **Clicks do nothing:** the Furnace has no `Collider2D`, or `ClickInput` isn't in the scene.
 - **The PiP shows the UI:** the PipCamera shouldn't render the UI. It won't with a Screen Space Overlay canvas, which is the default.
-- **The main camera renders a black screen after adding PipCamera:** check that the main camera's Target Texture is still **None**.
+- **The transition is not obscuring the full screen:** make sure `TransitionFade` is the last Canvas child and fills the Canvas.
 
 ---
 
@@ -190,8 +166,8 @@ Extend `Phase1SceneBuilder` (or add `Phase2SceneBuilder`) to add the zones, PipC
 
 | Feel | Tweak |
 |---|---|
-| Switching feels slow/floaty | ↓ `smoothTime` (0.1) |
-| Switching feels jarring | ↑ `smoothTime` (0.2–0.25) |
+| Switching feels slow/floaty | ↓ `fadeOutDuration` / `fadeInDuration` |
+| Switching feels abrupt | Slightly ↑ `fadeInDuration` (keep the total transition short) |
 | PiP too small to read | ↑ RawImage size, or ↓ PipCamera ortho size to zoom in |
 | Scroll too sensitive (trackpads) | Ignore scroll values below a small threshold |
 
