@@ -1,39 +1,80 @@
+using System.Collections;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
-public class Furnace : MonoBehaviour
+public class Furnace : MonoBehaviour, IClickable
 {
     [SerializeField] private float maxHeat = 100f;
     [SerializeField] private float startingHeat = 50f;
     [SerializeField] private float heatPerCoal = 20f;
     [SerializeField] private float baseBurnRate = 4f;       // heat lost per second, always
     [SerializeField] private float burnRatePerHeat = 0.04f; // extra loss per point of heat (hotter burns faster)
+    [SerializeField] private Color coldColor = new Color(0.2f, 0.2f, 0.2f);
+    [SerializeField] private Color hotColor = new Color(1f, 0.55f, 0.1f);
+    [SerializeField] private SpriteRenderer spriteRenderer;
 
     public float Heat { get; private set; }
     public float MaxHeat => maxHeat;
     public float Heat01 => Heat / maxHeat;
 
+    private Vector3 baseScale;
+    private Coroutine pulseRoutine;
+
     private void Awake()
     {
+        if (spriteRenderer == null)
+            spriteRenderer = GetComponent<SpriteRenderer>();
+
+        baseScale = transform.localScale;
         Heat = startingHeat;
     }
 
     private void Update()
     {
-        if (GameManager.Instance.IsGameOver) return;
-
-        // TEMP (Phase 1): Space adds coal. Phase 2 replaces this with clicking the furnace.
-        if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
-            AddCoal();
+        if (GameManager.Instance != null && GameManager.Instance.IsGameOver)
+            return;
 
         float burn = baseBurnRate + Heat * burnRatePerHeat;
         Heat = Mathf.Max(0f, Heat - burn * Time.deltaTime);
+
+        if (spriteRenderer != null)
+            spriteRenderer.color = Color.Lerp(coldColor, hotColor, Heat01);
+    }
+
+    public void OnPress()
+    {
+        AddCoal();
+    }
+
+    public void OnRelease()
+    {
     }
 
     public void AddCoal()
     {
-        if (Heat >= maxHeat) return; // don't waste coal on a full furnace
-        if (!ResourceManager.Instance.TrySpendCoal()) return;
+        if (Heat >= maxHeat)
+            return;
+
+        if (ResourceManager.Instance == null || !ResourceManager.Instance.TrySpendCoal())
+            return;
+
         Heat = Mathf.Min(maxHeat, Heat + heatPerCoal);
+
+        if (pulseRoutine != null)
+            StopCoroutine(pulseRoutine);
+
+        pulseRoutine = StartCoroutine(Pulse());
+    }
+
+    public void SetSpriteRendererForSceneBuilder(SpriteRenderer renderer)
+    {
+        spriteRenderer = renderer;
+    }
+
+    private IEnumerator Pulse()
+    {
+        transform.localScale = baseScale * 1.08f;
+        yield return new WaitForSeconds(0.07f);
+        transform.localScale = baseScale;
+        pulseRoutine = null;
     }
 }
