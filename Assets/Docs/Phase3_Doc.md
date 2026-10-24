@@ -89,8 +89,8 @@ public abstract class Obstacle : AltitudeObject
 ```
 
 **Physics setup:**
-- Ship: `BoxCollider2D` + `Rigidbody2D` (**Body Type = Kinematic**). A kinematic body is needed for trigger events.
-- Obstacles: `Collider2D` with **Is Trigger** on. No Rigidbody needed.
+- Ship: `BoxCollider2D` + `Rigidbody2D` (**Dynamic**, Gravity Scale 0, Constraints **Freeze All**). In 2D, Kinematic bodies don't get trigger contacts with other Kinematic or static colliders by default, so the ship uses a frozen Dynamic body and is still moved by transform.
+- Obstacles: `Collider2D` with **Is Trigger** on, plus a **Kinematic** `Rigidbody2D` (since they move every frame).
 
 **Bird (first obstacle):**
 - On hit: `ship.Knockback(knockbackMeters)` (about 15 m), plus a short burst of extra speed loss, then destroy (or tumble away).
@@ -110,7 +110,7 @@ CabinZone
 ├── Furnace
 └── SteeringWheel     (circle/square sprite 2.5 × 2.5, CircleCollider2D, + SteeringWheel)
 OutsideZone
-├── Ship              (+ BoxCollider2D, Rigidbody2D Kinematic)
+├── Ship              (+ BoxCollider2D, Rigidbody2D Dynamic / no gravity / Freeze All)
 └── CloudSea
 Managers              (+ ObstacleSpawner)
 ```
@@ -149,7 +149,7 @@ Extend the builder to add the wheel, ship physics, spawner, and generate the `Bi
 6. Watch the Hierarchy for a while: obstacles get destroyed and don't pile up.
 
 ### Gotchas
-- **Triggers never fire:** the ship needs a `Rigidbody2D` (Kinematic) and the obstacle collider needs Is Trigger.
+- **Triggers never fire:** the ship needs a `Rigidbody2D` (Dynamic, gravity 0, Freeze All) and the obstacle collider needs Is Trigger.
 - **The wheel spins backwards:** flip the sign in `angle -= delta`.
 - **Steering is wildly different between machines:** mouse delta is per frame in pixels, so **don't** multiply it by `deltaTime`. Just tune `sensitivity`.
 

@@ -1,24 +1,42 @@
+using System.Collections;
 using UnityEngine;
 
 public class ShipController : MonoBehaviour
 {
+    public const float UnitsPerMeter = 0.1f; // 1 world unit = 10 m, shared by everything in the sky
+
     [SerializeField] private Furnace furnace;
+    [SerializeField] private SteeringWheel wheel;
     [SerializeField] private float startingAltitude = 100f;
     [SerializeField] private float maxLiftSpeed = 15f; // m/s up at full heat
     [SerializeField] private float sinkSpeed = 5f;     // m/s down, always applied
     [SerializeField] private float acceleration = 4f;  // how quickly speed approaches its target
+    [SerializeField] private float maxSideSpeed = 4f;  // world units/s at full steer
+    [SerializeField] private float xLimit = 7f;
+    [SerializeField] private float maxTilt = 8f;       // degrees
+    [SerializeField] private float knockbackSpeed = 5f; // m/s down right after a hit
+    [SerializeField] private Color hitColor = new Color(1f, 0.3f, 0.3f);
+    [SerializeField] private Transform[] jugSlots;      // where milk jugs stick under the ship
 
     public float Altitude { get; private set; }
     public float MaxAltitude { get; private set; }
     public float VerticalSpeed { get; private set; }
 
-    // Extra sink in m/s. Phase 4: milk jugs add to this.
-    public float Weight { get; set; }
+    // Extra sink in m/s from milk jugs.
+    public float Weight { get; private set; }
+
+    private SpriteRenderer spriteRenderer;
+    private Color baseColor;
+    private Coroutine flashRoutine;
 
     private void Awake()
     {
         Altitude = startingAltitude;
         MaxAltitude = startingAltitude;
+
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        if (spriteRenderer != null)
+            baseColor = spriteRenderer.color;
     }
 
     private void Update()
@@ -28,5 +46,59 @@ public class ShipController : MonoBehaviour
 
         Altitude += VerticalSpeed * Time.deltaTime;
         MaxAltitude = Mathf.Max(MaxAltitude, Altitude);
+
+        float steer = wheel != null ? wheel.SteerInput : 0f;
+        Vector3 position = transform.position;
+        position.x = Mathf.Clamp(position.x + steer * maxSideSpeed * Time.deltaTime, -xLimit, xLimit);
+        transform.position = position;
+        transform.rotation = Quaternion.Euler(0f, 0f, -steer * maxTilt);
+    }
+
+    public void Knockback(float meters)
+    {
+        Altitude -= meters;
+        VerticalSpeed = Mathf.Min(VerticalSpeed, -knockbackSpeed);
+
+        if (spriteRenderer == null)
+            return;
+
+        if (flashRoutine != null)
+            StopCoroutine(flashRoutine);
+        flashRoutine = StartCoroutine(Flash());
+    }
+
+    public void AddWeight(float amount)
+    {
+        Weight += amount;
+    }
+
+    public void RemoveWeight(float amount)
+    {
+        Weight = Mathf.Max(0f, Weight - amount);
+    }
+
+    public bool TryGetFreeSlot(out Transform slot)
+    {
+        if (jugSlots != null)
+        {
+            foreach (Transform candidate in jugSlots)
+            {
+                if (candidate != null && candidate.childCount == 0)
+                {
+                    slot = candidate;
+                    return true;
+                }
+            }
+        }
+        slot = null;
+        return false;
+    }
+
+    private IEnumerator Flash()
+    {
+        spriteRenderer.color = hitColor;
+        yield return new WaitForSeconds(0.15f);
+        spriteRenderer.color = baseColor;
+        flashRoutine = null;
     }
 }

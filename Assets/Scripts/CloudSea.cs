@@ -7,9 +7,9 @@ public class CloudSea : MonoBehaviour
     [SerializeField] private float riseSpeed = 2f;           // m/s at start
     [SerializeField] private float riseAcceleration = 0.02f; // rise speed gained per second
     [SerializeField] private float maxGap = 150f;            // clouds never fall further behind than this
-    [SerializeField] private float unitsPerMeter = 0.1f;
 
     public float Altitude { get; private set; }
+    public float MaxGap => maxGap;
 
     private float currentRiseSpeed;
 
@@ -30,7 +30,7 @@ public class CloudSea : MonoBehaviour
         // The ship stays fixed on screen, so place the clouds relative to it.
         float gap = Altitude - ship.Altitude;
         Vector3 position = transform.position;
-        position.y = ship.transform.position.y + gap * unitsPerMeter;
+        position.y = ship.transform.position.y + gap * ShipController.UnitsPerMeter;
         transform.position = position;
 
         if (Altitude >= ship.Altitude)
