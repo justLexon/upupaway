@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 public class CameraSwitcher : MonoBehaviour
 {
@@ -12,20 +13,64 @@ public class CameraSwitcher : MonoBehaviour
 
     [SerializeField] private float outsideY = 0f;
     [SerializeField] private float cabinY = -50f;
-    [SerializeField] private float smoothTime = 0.15f;
+    [SerializeField] private float fadeOutDuration = 0.1f;
+    [SerializeField] private float fadeInDuration = 0.16f;
+    [SerializeField] private RawImage fadeOverlay;
 
     public View CurrentView { get; private set; } = View.Outside;
+    public bool IsTransitioning { get; private set; }
     public event Action<View> OnViewChanged;
 
     private View targetView = View.Outside;
-    private float velocity;
+    private float fadeAlpha;
+    private bool fadingOut;
 
-    private void Start()
+    private void Awake()
     {
-        UpdateCameraPosition();
+        EnsureFadeOverlay();
     }
 
     private void Update()
+    {
+        ReadInput();
+        if (fadeOverlay == null)
+            return;
+
+        if (!IsTransitioning)
+        {
+            if (targetView == CurrentView)
+                return;
+
+            IsTransitioning = true;
+            fadingOut = true;
+        }
+        else if (!fadingOut && targetView != CurrentView)
+        {
+            fadingOut = true;
+        }
+
+        if (fadingOut)
+        {
+            fadeAlpha = Mathf.MoveTowards(fadeAlpha, 1f, Time.unscaledDeltaTime / Mathf.Max(0.01f, fadeOutDuration));
+            SetFadeAlpha(fadeAlpha);
+            if (fadeAlpha >= 1f)
+            {
+                if (targetView != CurrentView)
+                    ChangeViewWhileCovered(targetView);
+
+                fadingOut = false;
+            }
+        }
+        else
+        {
+            fadeAlpha = Mathf.MoveTowards(fadeAlpha, 0f, Time.unscaledDeltaTime / Mathf.Max(0.01f, fadeInDuration));
+            SetFadeAlpha(fadeAlpha);
+            if (fadeAlpha <= 0f)
+                IsTransitioning = false;
+        }
+    }
+
+    private void ReadInput()
     {
         if (Mouse.current != null)
         {
@@ -43,8 +88,6 @@ public class CameraSwitcher : MonoBehaviour
             else if (Keyboard.current.sKey.wasPressedThisFrame || Keyboard.current.downArrowKey.wasPressedThisFrame)
                 targetView = View.Cabin;
         }
-
-        UpdateCameraPosition();
     }
 
     public void ToggleView()
@@ -52,18 +95,54 @@ public class CameraSwitcher : MonoBehaviour
         targetView = targetView == View.Outside ? View.Cabin : View.Outside;
     }
 
-    private void UpdateCameraPosition()
+    private void ChangeViewWhileCovered(View view)
     {
-        float targetY = targetView == View.Outside ? outsideY : cabinY;
+        float targetY = view == View.Outside ? outsideY : cabinY;
         Vector3 position = transform.position;
-        position.y = Mathf.SmoothDamp(position.y, targetY, ref velocity, smoothTime, Mathf.Infinity, Time.unscaledDeltaTime);
+        position.y = targetY;
         transform.position = position;
 
-        View visible = position.y > ((outsideY + cabinY) * 0.5f) ? View.Outside : View.Cabin;
-        if (visible != CurrentView)
+        CurrentView = view;
+        OnViewChanged?.Invoke(view);
+    }
+
+    private void EnsureFadeOverlay()
+    {
+        if (fadeOverlay != null)
         {
-            CurrentView = visible;
-            OnViewChanged?.Invoke(visible);
+            SetFadeAlpha(0f);
+            fadeOverlay.transform.SetAsLastSibling();
+            return;
         }
+
+        Canvas canvas = FindAnyObjectByType<Canvas>();
+        if (canvas == null)
+        {
+            Debug.LogError("CameraSwitcher requires a Canvas to display its transition fade.", this);
+            return;
+        }
+
+        var overlayObject = new GameObject("TransitionFade", typeof(RectTransform), typeof(RawImage));
+        overlayObject.transform.SetParent(canvas.transform, false);
+        overlayObject.transform.SetAsLastSibling();
+
+        RectTransform rect = overlayObject.GetComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+
+        fadeOverlay = overlayObject.GetComponent<RawImage>();
+        fadeOverlay.texture = Texture2D.whiteTexture;
+        fadeOverlay.raycastTarget = false;
+        SetFadeAlpha(0f);
+    }
+
+    private void SetFadeAlpha(float alpha)
+    {
+        if (fadeOverlay == null)
+            return;
+
+        fadeOverlay.color = new Color(0f, 0f, 0f, alpha);
     }
 }

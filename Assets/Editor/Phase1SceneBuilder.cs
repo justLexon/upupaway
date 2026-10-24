@@ -150,6 +150,14 @@ public static class Phase1SceneBuilder
         pipView.texture = pipTexture;
         pipView.raycastTarget = true;
 
+        var fadeOverlayGO = new GameObject("TransitionFade", typeof(RectTransform), typeof(RawImage));
+        fadeOverlayGO.transform.SetParent(canvasGO.transform, false);
+        Stretch(fadeOverlayGO.GetComponent<RectTransform>());
+        RawImage fadeOverlay = fadeOverlayGO.GetComponent<RawImage>();
+        fadeOverlay.texture = Texture2D.whiteTexture;
+        fadeOverlay.color = new Color(0f, 0f, 0f, 0f);
+        fadeOverlay.raycastTarget = false;
+
         var pipController = canvasGO.AddComponent<PipController>();
         var pipClick = pipViewGO.AddComponent<PipClickToSwitch>();
 
@@ -174,6 +182,7 @@ public static class Phase1SceneBuilder
         Assign(gameManager, "gameOverPanel", panelGO);
         Assign(shipComp, "furnace", furnaceComp);
         Assign(cloudComp, "ship", shipComp);
+        Assign(switcher, "fadeOverlay", fadeOverlay);
         Assign(hud, "text", debugText);
         Assign(hud, "ship", shipComp);
         Assign(hud, "furnace", furnaceComp);

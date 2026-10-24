@@ -4,7 +4,16 @@ using UnityEngine.InputSystem;
 
 public class ClickInput : MonoBehaviour
 {
+    private CameraSwitcher cameraSwitcher;
     private IClickable held;
+
+    private void Awake()
+    {
+        Camera mainCamera = Camera.main;
+        cameraSwitcher = mainCamera != null
+            ? mainCamera.GetComponent<CameraSwitcher>()
+            : FindAnyObjectByType<CameraSwitcher>();
+    }
 
     private void Update()
     {
@@ -14,7 +23,8 @@ public class ClickInput : MonoBehaviour
         if (Mouse.current == null)
             return;
 
-        if (Mouse.current.leftButton.wasPressedThisFrame)
+        if (Mouse.current.leftButton.wasPressedThisFrame &&
+            (cameraSwitcher == null || !cameraSwitcher.IsTransitioning))
             TryPress();
 
         if (Mouse.current.leftButton.wasReleasedThisFrame)
@@ -24,6 +34,9 @@ public class ClickInput : MonoBehaviour
     private void TryPress()
     {
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
+
+        if (Camera.main == null)
             return;
 
         Vector2 pointer = Mouse.current.position.ReadValue();
