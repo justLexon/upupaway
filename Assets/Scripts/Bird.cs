@@ -33,7 +33,14 @@ public class Bird : Obstacle
         position.x += direction * speed * Time.deltaTime;
         transform.position = position;
 
-        if ((direction > 0f && position.x > xEdge) || (direction < 0f && position.x < -xEdge))
+        // Birds only fly by day: at night they stop turning around and leave the screen.
+        bool night = DayNightCycle.Instance != null && DayNightCycle.Instance.IsNight;
+        if (night)
+        {
+            if (Mathf.Abs(position.x) > xEdge + 1.5f)
+                Destroy(gameObject);
+        }
+        else if ((direction > 0f && position.x > xEdge) || (direction < 0f && position.x < -xEdge))
         {
             direction = -direction;
             Face();

@@ -19,6 +19,7 @@ public class CameraSwitcher : MonoBehaviour
 
     public View CurrentView { get; private set; } = View.Outside;
     public bool IsTransitioning { get; private set; }
+    public bool InputLocked { get; set; } // e.g. stay outside while docked at a pitstop
     public event Action<View> OnViewChanged;
 
     private View targetView = View.Outside;
@@ -72,6 +73,9 @@ public class CameraSwitcher : MonoBehaviour
 
     private void ReadInput()
     {
+        if (InputLocked)
+            return;
+
         if (Mouse.current != null)
         {
             float scroll = Mouse.current.scroll.ReadValue().y;
@@ -93,6 +97,11 @@ public class CameraSwitcher : MonoBehaviour
     public void ToggleView()
     {
         targetView = targetView == View.Outside ? View.Cabin : View.Outside;
+    }
+
+    public void GoTo(View view)
+    {
+        targetView = view;
     }
 
     private void ChangeViewWhileCovered(View view)

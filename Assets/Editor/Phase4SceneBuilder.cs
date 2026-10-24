@@ -74,8 +74,8 @@ public static class Phase4SceneBuilder
         SetSpawnEntries(obstacleSpawner, (birdPrefab, 40f), (jugPrefab, 35f), (balloonPrefab, 25f));
         Assign(obstacleSpawner, "pityPrefab", balloonPrefab);
 
-        BuildAltitudeMeter(canvas.transform, ship, cloudSea);
-        BuildResourceHUD(canvas.transform, furnace);
+        HudBuilder.BuildAltitudeMeter(canvas.transform, ship, cloudSea, null);
+        HudBuilder.BuildResourceHUD(canvas.transform, furnace);
 
         // Game over results
         TextMeshProUGUI resultText = CreateText("ResultText", gameOverPanel.transform, 44, Color.white, TextAlignmentOptions.Center);
@@ -129,77 +129,4 @@ public static class Phase4SceneBuilder
         return SavePrefab(go).GetComponent<ResourceBalloon>();
     }
 
-    private static void BuildAltitudeMeter(Transform canvas, ShipController ship, CloudSea cloudSea)
-    {
-        RectTransform bar = CreateUI("AltitudeMeter", canvas, new Color(0f, 0f, 0f, 0.5f));
-        bar.anchorMin = bar.anchorMax = bar.pivot = new Vector2(0f, 0.5f);
-        bar.anchoredPosition = new Vector2(40f, -40f);
-        bar.sizeDelta = new Vector2(40f, 600f);
-        bar.GetComponent<UnityEngine.UI.Image>().raycastTarget = false;
-
-        RectTransform fill = CreateUI("Fill", bar, Color.green);
-        fill.anchorMin = Vector2.zero;
-        fill.anchorMax = new Vector2(1f, 0.5f);
-        fill.offsetMin = fill.offsetMax = Vector2.zero;
-        fill.GetComponent<UnityEngine.UI.Image>().raycastTarget = false;
-
-        RectTransform marker = CreateUI("ShipMarker", bar, new Color(0.55f, 0.35f, 0.2f));
-        marker.anchorMin = marker.anchorMax = new Vector2(0.5f, 0.5f);
-        marker.pivot = new Vector2(0.5f, 0.5f);
-        marker.sizeDelta = new Vector2(70f, 14f);
-        marker.GetComponent<UnityEngine.UI.Image>().raycastTarget = false;
-
-        TextMeshProUGUI altitudeText = CreateText("AltitudeText", bar, 40, Color.black, TextAlignmentOptions.BottomLeft);
-        RectTransform textRect = altitudeText.rectTransform;
-        textRect.anchorMin = textRect.anchorMax = new Vector2(0f, 1f);
-        textRect.pivot = new Vector2(0f, 0f);
-        textRect.anchoredPosition = new Vector2(0f, 10f);
-        textRect.sizeDelta = new Vector2(320f, 60f);
-
-        AltitudeMeter meter = bar.gameObject.AddComponent<AltitudeMeter>();
-        Assign(meter, "ship", ship);
-        Assign(meter, "cloudSea", cloudSea);
-        Assign(meter, "fill", fill);
-        Assign(meter, "fillImage", fill.GetComponent<UnityEngine.UI.Image>());
-        Assign(meter, "marker", marker);
-        Assign(meter, "altitudeText", altitudeText);
-    }
-
-    private static void BuildResourceHUD(Transform canvas, Furnace furnace)
-    {
-        // Top-right: clear of the PiP in both views.
-        RectTransform panel = CreateUI("ResourceHUD", canvas, new Color(0f, 0f, 0f, 0.45f));
-        panel.anchorMin = panel.anchorMax = panel.pivot = new Vector2(1f, 1f);
-        panel.anchoredPosition = new Vector2(-20f, -20f);
-        panel.sizeDelta = new Vector2(320f, 110f);
-        panel.GetComponent<UnityEngine.UI.Image>().raycastTarget = false;
-
-        TextMeshProUGUI coalText = CreateText("CoalText", panel, 36, Color.white, TextAlignmentOptions.Left);
-        RectTransform coalRect = coalText.rectTransform;
-        coalRect.anchorMin = new Vector2(0f, 1f);
-        coalRect.anchorMax = new Vector2(1f, 1f);
-        coalRect.pivot = new Vector2(0.5f, 1f);
-        coalRect.offsetMin = new Vector2(16f, -60f);
-        coalRect.offsetMax = new Vector2(-16f, -8f);
-
-        RectTransform heatBar = CreateUI("HeatBar", panel, new Color(0.15f, 0.15f, 0.15f));
-        heatBar.anchorMin = new Vector2(0f, 0f);
-        heatBar.anchorMax = new Vector2(1f, 0f);
-        heatBar.pivot = new Vector2(0.5f, 0f);
-        heatBar.offsetMin = new Vector2(16f, 14f);
-        heatBar.offsetMax = new Vector2(-16f, 40f);
-        heatBar.GetComponent<UnityEngine.UI.Image>().raycastTarget = false;
-
-        RectTransform heatFill = CreateUI("HeatFill", heatBar, new Color(1f, 0.55f, 0.1f));
-        heatFill.anchorMin = Vector2.zero;
-        heatFill.anchorMax = new Vector2(0.5f, 1f);
-        heatFill.offsetMin = heatFill.offsetMax = Vector2.zero;
-        heatFill.GetComponent<UnityEngine.UI.Image>().raycastTarget = false;
-
-        ResourceHUD hud = panel.gameObject.AddComponent<ResourceHUD>();
-        Assign(hud, "furnace", furnace);
-        Assign(hud, "coalText", coalText);
-        Assign(hud, "heatFill", heatFill);
-        Assign(hud, "heatFillImage", heatFill.GetComponent<UnityEngine.UI.Image>());
-    }
 }

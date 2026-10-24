@@ -8,6 +8,7 @@ public class ObstacleSpawner : MonoBehaviour
     {
         public AltitudeObject prefab;
         public float weight = 1f;
+        public bool dayOnly; // e.g. birds
     }
 
     [SerializeField] private ShipController ship;
@@ -63,17 +64,28 @@ public class ObstacleSpawner : MonoBehaviour
 
     private AltitudeObject PickPrefab()
     {
+        bool night = DayNightCycle.Instance != null && DayNightCycle.Instance.IsNight;
+
         float total = 0f;
         foreach (SpawnEntry entry in entries)
-            total += entry.weight;
+        {
+            if (!(entry.dayOnly && night))
+                total += entry.weight;
+        }
+        if (total <= 0f)
+            return null;
 
         float roll = Random.value * total;
+        AltitudeObject last = null;
         foreach (SpawnEntry entry in entries)
         {
+            if (entry.dayOnly && night)
+                continue;
+            last = entry.prefab;
             roll -= entry.weight;
             if (roll <= 0f)
                 return entry.prefab;
         }
-        return entries.Length > 0 ? entries[entries.Length - 1].prefab : null;
+        return last;
     }
 }

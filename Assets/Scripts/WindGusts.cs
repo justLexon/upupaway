@@ -21,6 +21,10 @@ public class WindGusts : MonoBehaviour
     // x = world units/s sideways, y = m/s up/down. Signed.
     public Vector2 CurrentPush { get; private set; }
 
+    // Set by WeatherSystem: storms bring stronger, more frequent gusts.
+    public float StrengthMultiplier { get; set; } = 1f;
+    public float FrequencyMultiplier { get; set; } = 1f;
+
     private float nextGustTime;
     private float gustStart;
     private float gustDuration;
@@ -38,6 +42,13 @@ public class WindGusts : MonoBehaviour
 
     private void Update()
     {
+        // No wind while docked.
+        if (GameManager.Instance != null && GameManager.Instance.IsPaused)
+        {
+            UpdateStreaks(0f);
+            return;
+        }
+
         if (!gustActive && Time.time >= nextGustTime)
             StartGust();
 
@@ -48,7 +59,7 @@ public class WindGusts : MonoBehaviour
             if (t >= 1f)
             {
                 gustActive = false;
-                nextGustTime = Time.time + Random.Range(intervalRange.x, intervalRange.y);
+                nextGustTime = Time.time + Random.Range(intervalRange.x, intervalRange.y) / Mathf.Max(0.1f, FrequencyMultiplier);
             }
             else
             {
@@ -67,7 +78,7 @@ public class WindGusts : MonoBehaviour
         gustActive = true;
         gustStart = Time.time;
         gustDuration = Random.Range(durationRange.x, durationRange.y);
-        gustStrength = Random.Range(strengthRange.x, strengthRange.y) * (Random.value < 0.5f ? -1f : 1f);
+        gustStrength = Random.Range(strengthRange.x, strengthRange.y) * StrengthMultiplier * (Random.value < 0.5f ? -1f : 1f);
         gustVertical = Random.Range(-maxVerticalPush, maxVerticalPush);
     }
 

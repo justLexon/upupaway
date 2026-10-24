@@ -143,6 +143,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Flapper
   angle: 6
   speed: 2
+  useUnscaledTime: 0
 --- !u!114 &7122758756249068425
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -481,6 +482,7 @@ MonoBehaviour:
   tapsToRemove: 1
   fallSpeed: 8
   fallSpin: 360
+  sellFlyTime: 0.5
   balloon: {fileID: 3206063124157283476}
 --- !u!1 &6372887898828756309
 GameObject:

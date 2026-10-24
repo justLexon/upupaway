@@ -43,11 +43,18 @@ public class ClickInput : MonoBehaviour
         Vector3 worldPoint = Camera.main.ScreenToWorldPoint(pointer);
         worldPoint.z = 0f;
 
+        // Colliders moved by transform only update on a physics step, and none run while paused (pitstops),
+        // so sync them first or e.g. the shop's buttons would still be where the station started.
+        Physics2D.SyncTransforms();
+
         // Check every collider under the mouse, so e.g. the ship's collider can't hide a milk jug.
         foreach (Collider2D hit in Physics2D.OverlapPointAll(worldPoint))
         {
             var clickable = hit.GetComponentInParent<IClickable>();
             if (clickable == null)
+                continue;
+
+            if (GameManager.Instance != null && GameManager.Instance.IsPaused && !clickable.WorksWhilePaused)
                 continue;
 
             held = clickable;

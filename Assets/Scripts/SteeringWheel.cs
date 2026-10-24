@@ -15,7 +15,7 @@ public class SteeringWheel : MonoBehaviour, IClickable
 
     private void Update()
     {
-        if (GameManager.Instance != null && GameManager.Instance.IsGameOver)
+        if (GameManager.Instance != null && (GameManager.Instance.IsGameOver || GameManager.Instance.IsPaused))
             return;
 
         // Mouse delta is already per frame, so it isn't scaled by deltaTime.

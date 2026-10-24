@@ -9,13 +9,74 @@ public static class VisualsBuilder
 {
     private static Sprite square;
     private static Sprite circle;
-    private static Sprite ring;
 
     [MenuItem("Tools/Up Up Away/Build Visuals")]
     public static void Build()
     {
         if (!OpenMainScene(out var scene)) return;
 
+        ApplyToOpenScene();
+
+        SaveScene(scene);
+        Debug.Log("Visuals built. Press Play!");
+    }
+
+    // Just swaps the ship's art (e.g. after editing the airship sprite sheet).
+    [MenuItem("Tools/Up Up Away/Build Ship Sprite")]
+    public static void BuildShipOnly()
+    {
+        if (!OpenMainScene(out var scene)) return;
+
+        ShipController ship = Object.FindAnyObjectByType<ShipController>();
+        if (ship == null)
+        {
+            EditorUtility.DisplayDialog("No ship", "Build the earlier phases first.", "OK");
+            return;
+        }
+        BuildShip(ship);
+
+        SaveScene(scene);
+        Debug.Log("Ship sprite applied. Press Play!");
+    }
+
+    // Just swaps the background cloud art (the SkyPuff prefab).
+    [MenuItem("Tools/Up Up Away/Build Cloud Sprite")]
+    public static void BuildCloudsOnly()
+    {
+        if (!OpenMainScene(out var scene)) return;
+
+        if (RebuildPrefab<AltitudeObject>("SkyPuff", CreateSkyPuffPrefab).Count == 0)
+        {
+            EditorUtility.DisplayDialog("No clouds yet", "Build Phase 3 first (it adds the background clouds).", "OK");
+            return;
+        }
+
+        SaveScene(scene);
+        Debug.Log("Cloud sprite applied. Press Play!");
+    }
+
+    // Just swaps the steering wheel + stand art.
+    [MenuItem("Tools/Up Up Away/Build Wheel Sprite")]
+    public static void BuildWheelOnly()
+    {
+        if (!OpenMainScene(out var scene)) return;
+
+        SteeringWheel wheel = Object.FindAnyObjectByType<SteeringWheel>();
+        if (wheel == null)
+        {
+            EditorUtility.DisplayDialog("No steering wheel", "Build the earlier phases first.", "OK");
+            return;
+        }
+        wheel.transform.localPosition = new Vector3(0f, FloorTop + StandBaseBelowCenter, 0f);
+        BuildWheel(wheel);
+
+        SaveScene(scene);
+        Debug.Log("Wheel sprite applied. Press Play!");
+    }
+
+    // Also called by Build Art Style.
+    public static void ApplyToOpenScene()
+    {
         LoadSprites();
 
         ShipController ship = Object.FindAnyObjectByType<ShipController>();
@@ -25,7 +86,7 @@ public static class VisualsBuilder
 
         // Cabin layout: wheel in the middle, furnace + coal on the left, everything standing on the floor.
         if (cabinZone != null) BuildCabinFloor(cabinZone.transform);
-        if (wheel != null) wheel.transform.localPosition = new Vector3(0f, FloorTop + 2.75f, 0f);
+        if (wheel != null) wheel.transform.localPosition = new Vector3(0f, FloorTop + StandBaseBelowCenter, 0f); // stand rests on the floor
         if (furnace != null) furnace.transform.localPosition = new Vector3(-5f, FloorTop + 1.32f, 0f);
 
         if (ship != null) BuildShip(ship);
@@ -40,9 +101,46 @@ public static class VisualsBuilder
             SetFloat(decor, "minSpacing", 12f);
             SetFloat(decor, "maxSpacing", 22f);
         }
+    }
 
-        SaveScene(scene);
-        Debug.Log("Visuals built. Press Play!");
+    // Ink silhouette outline: an Ink copy of every part, slightly bigger, drawn behind everything.
+    // Animated parts (propeller, flames) are skipped since their outline wouldn't animate with them.
+    private static void AddOutlines(Transform root, float thickness, int sortingOrder, bool includeRoot)
+    {
+        DestroyChild(root, "RootOutline");
+
+        foreach (SpriteRenderer part in root.GetComponentsInChildren<SpriteRenderer>(true))
+        {
+            bool isRoot = part.transform == root;
+            if (isRoot && !includeRoot) continue;
+            if (part.color.a < 0.99f) continue; // shines and highlights
+            if (part.GetComponent<PropellerSpin>() != null || part.GetComponentInParent<FurnaceFlames>() != null) continue;
+
+            var outline = new GameObject(isRoot ? "RootOutline" : part.name + "_Outline").transform;
+            Vector3 world = part.transform.lossyScale;
+            float growX = (Mathf.Abs(world.x) + thickness) / Mathf.Max(0.0001f, Mathf.Abs(world.x));
+            float growY = (Mathf.Abs(world.y) + thickness) / Mathf.Max(0.0001f, Mathf.Abs(world.y));
+
+            if (isRoot)
+            {
+                outline.SetParent(root, false);
+                outline.localScale = new Vector3(growX, growY, 1f);
+            }
+            else
+            {
+                outline.SetParent(part.transform.parent, false);
+                outline.localPosition = part.transform.localPosition;
+                outline.localRotation = part.transform.localRotation;
+                Vector3 local = part.transform.localScale;
+                outline.localScale = new Vector3(local.x * growX, local.y * growY, 1f);
+            }
+
+            var renderer = outline.gameObject.AddComponent<SpriteRenderer>();
+            renderer.sprite = part.sprite;
+            renderer.color = ArtPalette.Ink;
+            renderer.sortingOrder = sortingOrder;
+            renderer.sharedMaterial = part.sharedMaterial;
+        }
     }
 
     private const float FloorTop = -3.6f; // cabin-local Y where things stand
@@ -51,7 +149,6 @@ public static class VisualsBuilder
     {
         square = SquareSprite();
         circle = GetOrCreateCircleSprite();
-        ring = GetOrCreateRingSprite();
     }
 
     // ---------- Cabin floor ----------
@@ -61,9 +158,9 @@ public static class VisualsBuilder
         DestroyChild(cabin, "CabinFloor");
         Transform floor = Container(cabin, "CabinFloor");
 
-        Color plank = new Color(0.42f, 0.27f, 0.14f);
-        Color gap = new Color(0.25f, 0.15f, 0.07f);
-        Color trim = new Color(0.3f, 0.18f, 0.09f);
+        Color plank = ArtPalette.WoodDark;
+        Color gap = ArtPalette.Ink;
+        Color trim = ArtPalette.Ink;
 
         float height = 5f + FloorTop; // from the cabin's bottom edge (-5) up to the floor top
         Part(floor, "Planks", square, plank, -9, new Vector2(0f, -5f + height / 2f), new Vector2(18f, height));
@@ -114,53 +211,77 @@ public static class VisualsBuilder
         DestroyChild(root, "Visuals");
         Transform v = Container(root, "Visuals");
 
-        Color canvas = new Color(0.9f, 0.82f, 0.64f);
-        Color canvasLight = new Color(0.97f, 0.92f, 0.78f);
-        Color stripe = new Color(0.72f, 0.2f, 0.2f);
-        Color wood = new Color(0.55f, 0.34f, 0.18f);
-        Color woodDark = new Color(0.33f, 0.19f, 0.09f);
-        Color iron = new Color(0.2f, 0.2f, 0.22f);
-        Color rope = new Color(0.4f, 0.32f, 0.22f);
-
-        // Tail fins (behind the envelope)
-        Part(v, "FinTop", square, stripe, 0, new Vector2(-1.6f, 1.7f), new Vector2(0.5f, 0.5f), 45f);
-        Part(v, "FinBottom", square, stripe, 0, new Vector2(-1.6f, 0.6f), new Vector2(0.5f, 0.5f), 45f);
-        Part(v, "FinBack", square, stripe, 0, new Vector2(-1.8f, 1.15f), new Vector2(0.45f, 0.45f), 45f);
-
-        // Envelope (the balloon)
-        Part(v, "Envelope", circle, canvas, 1, new Vector2(0f, 1.15f), new Vector2(3.6f, 1.5f));
-        Part(v, "Highlight", circle, canvasLight, 2, new Vector2(-0.2f, 1.45f), new Vector2(2.4f, 0.45f));
-        Part(v, "Stripe", square, stripe, 3, new Vector2(0f, 1.1f), new Vector2(3.3f, 0.16f));
-        Part(v, "NoseCap", circle, stripe, 3, new Vector2(1.72f, 1.13f), new Vector2(0.18f, 0.5f));
-
-        // Ropes from envelope to gondola
-        Part(v, "RopeL", square, rope, 0, new Vector2(-0.75f, 0.32f), new Vector2(0.04f, 0.42f), -25f);
-        Part(v, "RopeR", square, rope, 0, new Vector2(0.75f, 0.32f), new Vector2(0.04f, 0.42f), 25f);
-        Part(v, "RopeML", square, rope, 0, new Vector2(-0.25f, 0.3f), new Vector2(0.04f, 0.35f));
-        Part(v, "RopeMR", square, rope, 0, new Vector2(0.25f, 0.3f), new Vector2(0.04f, 0.35f));
-
-        // Smokestack
-        Part(v, "Smokestack", square, iron, 1, new Vector2(1.0f, 0.3f), new Vector2(0.14f, 0.35f));
-        Part(v, "SmokestackRim", square, Color.black, 1, new Vector2(1.0f, 0.48f), new Vector2(0.2f, 0.06f));
-
-        // Gondola
-        Part(v, "Keel", circle, wood, 1, new Vector2(0f, -0.42f), new Vector2(2.0f, 0.4f));
-        Part(v, "Gondola", square, wood, 2, new Vector2(0f, -0.15f), new Vector2(2.0f, 0.6f));
-        Part(v, "TrimTop", square, woodDark, 3, new Vector2(0f, 0.15f), new Vector2(2.15f, 0.1f));
-        Part(v, "TrimBottom", square, woodDark, 3, new Vector2(0f, -0.44f), new Vector2(2.0f, 0.07f));
-
-        for (int i = 0; i < 3; i++)
+        // Hand-drawn pixel art from the sliced sprite sheet, looping while the game runs.
+        Sprite[] frames = LoadShipFrames();
+        if (frames.Length == 0)
         {
-            float x = (i - 1) * 0.55f;
-            Part(v, "WindowFrame" + i, circle, woodDark, 3, new Vector2(x, -0.12f), new Vector2(0.3f, 0.3f));
-            Part(v, "Window" + i, circle, new Color(1f, 0.88f, 0.5f), 4, new Vector2(x, -0.12f), new Vector2(0.22f, 0.22f));
+            Debug.LogWarning($"No sprites found in {ShipSheetPath}. Slice it in the Sprite Editor first.");
+            return;
         }
 
-        // Rear propeller
-        Part(v, "PropHub", circle, iron, 4, new Vector2(-1.1f, -0.15f), new Vector2(0.16f, 0.16f));
-        GameObject blade = Part(v, "PropBlade", square, new Color(0.55f, 0.55f, 0.6f), 3,
-            new Vector2(-1.16f, -0.15f), new Vector2(0.07f, 0.65f));
-        blade.AddComponent<PropellerSpin>();
+        GameObject art = Part(v, "ShipSprite", frames[0], Color.white, 2, new Vector2(0f, 0.6f), new Vector2(1.8f, 1.8f));
+        art.AddComponent<SpriteLoop>().SetFramesForSceneBuilder(frames);
+
+        // Fit the hitbox to the sprite (envelope top to gondola bottom).
+        if (collider != null)
+        {
+            collider.size = new Vector2(3.3f, 2.7f);
+            collider.offset = new Vector2(0f, 0.66f);
+        }
+    }
+
+    private const string ShipSheetPath = "Assets/Art/Sprites/airship-sprite-sheet-.png";
+
+    // All slices of the sheet in order (_0, _1, ...), imported crisp for pixel art.
+    private static Sprite[] LoadShipFrames()
+    {
+        var importer = AssetImporter.GetAtPath(ShipSheetPath) as TextureImporter;
+        if (importer == null)
+            return new Sprite[0];
+        if (importer.filterMode != FilterMode.Point || importer.textureCompression != TextureImporterCompression.Uncompressed)
+        {
+            importer.filterMode = FilterMode.Point;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.SaveAndReimport();
+        }
+
+        var frames = new System.Collections.Generic.List<Sprite>();
+        foreach (Object asset in AssetDatabase.LoadAllAssetsAtPath(ShipSheetPath))
+            if (asset is Sprite sprite)
+                frames.Add(sprite);
+        frames.Sort((a, b) => FrameIndex(a).CompareTo(FrameIndex(b)));
+        return frames.ToArray();
+    }
+
+    private const string CloudSpritePath = "Assets/Art/Sprites/cloud-pixelart.png";
+
+    // A single-image sprite, imported crisp for pixel art.
+    private static Sprite LoadPixelSprite(string path)
+    {
+        AssetDatabase.ImportAsset(path); // in case Unity hasn't picked up a newly added file yet
+        var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+        if (importer == null)
+        {
+            Debug.LogWarning($"{path} not found.");
+            return null;
+        }
+        if (importer.textureType != TextureImporterType.Sprite || importer.filterMode != FilterMode.Point
+            || importer.textureCompression != TextureImporterCompression.Uncompressed)
+        {
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.filterMode = FilterMode.Point;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.mipmapEnabled = false;
+            importer.SaveAndReimport();
+        }
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
+    private static int FrameIndex(Sprite sprite)
+    {
+        int underscore = sprite.name.LastIndexOf('_');
+        return underscore >= 0 && int.TryParse(sprite.name.Substring(underscore + 1), out int index) ? index : 0;
     }
 
     // ---------- Steering wheel ----------
@@ -170,45 +291,30 @@ public static class VisualsBuilder
         Transform root = wheel.transform;
         DestroyChild(root, "Spoke");
         DestroyChild(root, "Visuals");
+        DestroyChild(root, "RootOutline");
 
-        Color wood = new Color(0.5f, 0.3f, 0.14f);
-        Color woodLight = new Color(0.72f, 0.5f, 0.27f);
-        Color brass = new Color(0.86f, 0.7f, 0.3f);
-
-        // The root sprite becomes the rim.
+        // Pixel art: both images share the same 256px canvas and center, so they stack at the same spot and scale.
+        // The wheel is drawn by the root (which SteeringWheel rotates); the stand is a sibling, so it never turns.
+        root.localScale = new Vector3(WheelArtScale, WheelArtScale, 1f);
         var rim = root.GetComponent<SpriteRenderer>();
-        rim.sprite = ring;
-        rim.color = wood;
+        rim.sprite = LoadPixelSprite(WheelSpritePath);
+        rim.color = Color.white;
         rim.sortingOrder = 6;
 
         var collider = root.GetComponent<CircleCollider2D>();
         if (collider != null)
-            collider.radius = 0.62f; // include the handles
+            collider.radius = 0.43f; // the wheel is ~86px across in the image, including handles
 
-        Transform v = Container(root, "Visuals");
-
-        // 4 spokes crossing the hub = 8 handles sticking out past the rim.
-        for (int i = 0; i < 4; i++)
-            Part(v, "Spoke" + i, square, woodLight, 5, Vector2.zero, new Vector2(0.07f, 1.2f), i * 45f);
-
-        for (int i = 0; i < 8; i++)
-        {
-            float a = i * 45f * Mathf.Deg2Rad;
-            var pos = new Vector2(Mathf.Sin(a), Mathf.Cos(a)) * 0.6f;
-            Part(v, "Handle" + i, circle, woodLight, 6, pos, new Vector2(0.12f, 0.12f));
-        }
-
-        Part(v, "Hub", circle, brass, 7, Vector2.zero, new Vector2(0.24f, 0.24f));
-        Part(v, "HubCenter", circle, wood, 8, Vector2.zero, new Vector2(0.1f, 0.1f));
-        Part(v, "Marker", square, brass, 7, new Vector2(0f, 0.6f), new Vector2(0.08f, 0.12f)); // shows "straight ahead"
-
-        // Stand: a sibling, so it doesn't rotate with the wheel.
         Transform parent = root.parent;
         DestroyChild(parent, "WheelStand");
         Transform stand = Container(parent, "WheelStand", root.localPosition);
-        Part(stand, "Post", square, new Color(0.3f, 0.18f, 0.08f), 4, new Vector2(0f, -1.3f), new Vector2(0.4f, 2.6f));
-        Part(stand, "Base", square, new Color(0.25f, 0.15f, 0.07f), 4, new Vector2(0f, -2.6f), new Vector2(1.4f, 0.3f));
+        Part(stand, "Stand", LoadPixelSprite(StandSpritePath), Color.white, 2, Vector2.zero, new Vector2(WheelArtScale, WheelArtScale));
     }
+
+    private const string WheelSpritePath = "Assets/Art/Sprites/steering-wheel-pixelart.png";
+    private const string StandSpritePath = "Assets/Art/Sprites/stand-for-steering-wheel-pixelart.png";
+    private const float WheelArtScale = 2f;
+    private const float StandBaseBelowCenter = 0.88f * WheelArtScale; // the stand's base is 88px below the image center
 
     // ---------- Furnace + coal pile ----------
 
@@ -217,9 +323,9 @@ public static class VisualsBuilder
         Transform root = furnace.transform; // scaled 2x2, so 1 local unit = 2 world units
         DestroyChild(root, "Visuals");
 
-        Color iron = new Color(0.2f, 0.2f, 0.22f);
-        Color ironDark = new Color(0.11f, 0.11f, 0.12f);
-        Color rivet = new Color(0.42f, 0.42f, 0.45f);
+        Color iron = ArtPalette.Iron;
+        Color ironDark = ArtPalette.IronDark;
+        Color rivet = ArtPalette.Brass;
 
         var body = root.GetComponent<SpriteRenderer>();
         body.color = iron;
@@ -242,17 +348,17 @@ public static class VisualsBuilder
 
         // Pressure gauge
         Part(v, "GaugeRim", circle, ironDark, 6, new Vector2(-0.28f, 0.3f), new Vector2(0.22f, 0.22f));
-        Part(v, "GaugeFace", circle, new Color(0.95f, 0.92f, 0.82f), 7, new Vector2(-0.28f, 0.3f), new Vector2(0.17f, 0.17f));
-        Part(v, "GaugeNeedle", square, new Color(0.7f, 0.15f, 0.1f), 8, new Vector2(-0.28f, 0.3f), new Vector2(0.02f, 0.08f), -40f);
+        Part(v, "GaugeFace", circle, ArtPalette.Cream, 7, new Vector2(-0.28f, 0.3f), new Vector2(0.17f, 0.17f));
+        Part(v, "GaugeNeedle", square, ArtPalette.Signal, 8, new Vector2(-0.28f, 0.3f), new Vector2(0.02f, 0.08f), -40f);
 
         // Door: the glow is what Furnace tints by heat.
         Part(v, "DoorFrame", square, ironDark, 6, new Vector2(0f, -0.08f), new Vector2(0.62f, 0.46f));
-        GameObject glow = Part(v, "FireGlow", square, new Color(0.2f, 0.2f, 0.2f), 7, new Vector2(0f, -0.08f), new Vector2(0.52f, 0.36f));
+        GameObject glow = Part(v, "FireGlow", square, ArtPalette.IronDark, 7, new Vector2(0f, -0.08f), new Vector2(0.52f, 0.36f));
         Assign(furnace, "spriteRenderer", glow.GetComponent<SpriteRenderer>());
 
         Transform flamesRoot = Container(v, "Flames", new Vector2(0f, -0.14f));
         var flames = new Transform[3];
-        Color[] flameColors = { new Color(1f, 0.45f, 0.1f), new Color(1f, 0.8f, 0.2f), new Color(1f, 0.45f, 0.1f) };
+        Color[] flameColors = { ArtPalette.Flame, ArtPalette.Ember, ArtPalette.Flame };
         for (int i = 0; i < 3; i++)
         {
             float x = (i - 1) * 0.14f;
@@ -267,6 +373,8 @@ public static class VisualsBuilder
         for (int i = 0; i < flames.Length; i++)
             flameList.GetArrayElementAtIndex(i).objectReferenceValue = flames[i];
         flameSo.ApplyModifiedPropertiesWithoutUndo();
+
+        AddOutlines(root, 0.06f, 3, true);
 
         BuildCoalPile(furnace, glow.transform);
     }
@@ -368,27 +476,28 @@ public static class VisualsBuilder
         new Color(0.25f, 0.8f, 0.8f),   // teal
     };
 
-    public static MilkJug CreateMilkJugPrefab()
+    // The jug + its balloon, centered on the jug. Shared by the MilkJug obstacle and the pitstop's milk display.
+    // Returns the balloon (so the obstacle can pop it).
+    public static Transform BuildMilkJugArt(Transform t, int orderOffset = 0, bool unscaledSway = false)
     {
         LoadSprites();
 
-        var go = new GameObject("MilkJug");
-        Transform t = go.transform;
-
-        // Same jug as before, just laid out at scale 1 so the balloon isn't stretched.
-        Part(t, "Body", square, new Color(0.97f, 0.97f, 0.95f), 4, Vector2.zero, new Vector2(0.3f, 0.45f));
-        Part(t, "Cap", square, new Color(0.2f, 0.45f, 0.9f), 5, new Vector2(0f, 0.2475f), new Vector2(0.18f, 0.09f));
+        Part(t, "Body", square, new Color(0.97f, 0.97f, 0.95f), 4 + orderOffset, Vector2.zero, new Vector2(0.3f, 0.45f));
+        Part(t, "Cap", square, new Color(0.2f, 0.45f, 0.9f), 5 + orderOffset, new Vector2(0f, 0.2475f), new Vector2(0.18f, 0.09f));
 
         // Balloon, pivoting at the cap so it sways.
         Transform balloon = Container(t, "Balloon", new Vector2(0f, 0.29f));
-        Part(balloon, "String", square, new Color(0.35f, 0.3f, 0.25f), 3, new Vector2(0f, 0.2f), new Vector2(0.025f, 0.4f));
-        GameObject knot = Part(balloon, "Knot", square, Color.white, 4, new Vector2(0f, 0.42f), new Vector2(0.08f, 0.08f), 45f);
-        GameObject body = Part(balloon, "BalloonBody", circle, Color.white, 4, new Vector2(0f, 0.7f), new Vector2(0.48f, 0.58f));
-        Part(balloon, "Shine", circle, new Color(1f, 1f, 1f, 0.6f), 5, new Vector2(-0.1f, 0.8f), new Vector2(0.1f, 0.16f), 20f);
+        Part(balloon, "String", square, new Color(0.35f, 0.3f, 0.25f), 3 + orderOffset, new Vector2(0f, 0.2f), new Vector2(0.025f, 0.4f));
+        GameObject knot = Part(balloon, "Knot", square, Color.white, 4 + orderOffset, new Vector2(0f, 0.42f), new Vector2(0.08f, 0.08f), 45f);
+        GameObject body = Part(balloon, "BalloonBody", circle, Color.white, 4 + orderOffset, new Vector2(0f, 0.7f), new Vector2(0.48f, 0.58f));
+        Part(balloon, "Shine", circle, new Color(1f, 1f, 1f, 0.6f), 5 + orderOffset, new Vector2(-0.1f, 0.8f), new Vector2(0.1f, 0.16f), 20f);
 
         var sway = balloon.gameObject.AddComponent<Flapper>();
-        SetFloat(sway, "angle", 6f);
-        SetFloat(sway, "speed", 2f);
+        var swaySo = new SerializedObject(sway);
+        swaySo.FindProperty("angle").floatValue = 6f;
+        swaySo.FindProperty("speed").floatValue = 2f;
+        swaySo.FindProperty("useUnscaledTime").boolValue = unscaledSway;
+        swaySo.ApplyModifiedPropertiesWithoutUndo();
 
         var look = balloon.gameObject.AddComponent<RandomLook>();
         var lookSo = new SerializedObject(look);
@@ -398,6 +507,14 @@ public static class VisualsBuilder
         targets.GetArrayElementAtIndex(1).objectReferenceValue = knot.GetComponent<SpriteRenderer>();
         SetColors(lookSo.FindProperty("palette"), JugBalloonColors);
         lookSo.ApplyModifiedPropertiesWithoutUndo();
+
+        return balloon;
+    }
+
+    public static MilkJug CreateMilkJugPrefab()
+    {
+        var go = new GameObject("MilkJug");
+        Transform balloon = BuildMilkJugArt(go.transform);
 
         var collider = go.AddComponent<BoxCollider2D>();
         collider.isTrigger = true;
@@ -415,36 +532,17 @@ public static class VisualsBuilder
     // Also used by the Phase 3 builder.
     public static AltitudeObject CreateSkyPuffPrefab()
     {
-        LoadSprites();
-
-        Color top = new Color(0.98f, 0.99f, 1f);
-        Color shade = new Color(0.82f, 0.88f, 0.96f);
-
         var go = new GameObject("SkyPuff");
-        Transform t = go.transform;
 
-        // Bumps on top + a flat bottom. A shaded copy sits slightly lower and behind.
-        (Vector2 pos, Vector2 size)[] shapes =
-        {
-            (new Vector2(0f, 0.15f), new Vector2(1.2f, 1.1f)),
-            (new Vector2(-0.7f, -0.05f), new Vector2(0.9f, 0.8f)),
-            (new Vector2(0.7f, -0.05f), new Vector2(0.95f, 0.85f)),
-            (new Vector2(-0.3f, 0.35f), new Vector2(0.8f, 0.8f)),
-            (new Vector2(0.4f, 0.3f), new Vector2(0.9f, 0.85f)),
-        };
-        for (int i = 0; i < shapes.Length; i++)
-        {
-            Part(t, "Shade" + i, circle, shade, -7, shapes[i].pos + new Vector2(0.05f, -0.1f), shapes[i].size);
-            Part(t, "Puff" + i, circle, top, -6, shapes[i].pos, shapes[i].size);
-        }
-        Part(t, "ShadeBase", square, shade, -7, new Vector2(0.05f, -0.4f), new Vector2(1.7f, 0.4f));
-        Part(t, "Base", square, top, -6, new Vector2(0f, -0.3f), new Vector2(1.7f, 0.4f));
+        // Hand-drawn pixel-art cloud. The visible cloud is ~60% of the 256px image, so scale it up.
+        Sprite cloud = LoadPixelSprite(CloudSpritePath);
+        Part(go.transform, "Cloud", cloud, Color.white, -6, Vector2.zero, new Vector2(1.6f, 1.6f));
 
         go.AddComponent<AltitudeObject>();
         var look = go.AddComponent<RandomLook>();
         var lookSo = new SerializedObject(look);
         lookSo.FindProperty("scaleRange").vector2Value = new Vector2(0.6f, 1.6f);
-        lookSo.FindProperty("randomFlipX").boolValue = true;
+        lookSo.FindProperty("randomFlipX").boolValue = true; // mirror half of them so they don't all look the same
         lookSo.ApplyModifiedPropertiesWithoutUndo();
 
         return SavePrefab(go).GetComponent<AltitudeObject>();
@@ -464,15 +562,15 @@ public static class VisualsBuilder
     {
         LoadSprites();
 
-        Color body = new Color(0.22f, 0.22f, 0.28f);
-        Color wing = new Color(0.32f, 0.32f, 0.4f);
+        Color body = ArtPalette.IronDark;
+        Color wing = ArtPalette.Iron;
 
         var go = new GameObject("Bird");
         Transform t = go.transform;
 
         Part(t, "Tail", square, body, 2, new Vector2(-0.3f, 0.02f), new Vector2(0.18f, 0.18f), 45f);
         Part(t, "Body", circle, body, 3, Vector2.zero, new Vector2(0.55f, 0.32f));
-        Part(t, "Beak", square, new Color(1f, 0.6f, 0.15f), 3, new Vector2(0.43f, 0.08f), new Vector2(0.12f, 0.12f), 45f);
+        Part(t, "Beak", square, ArtPalette.Flame, 3, new Vector2(0.43f, 0.08f), new Vector2(0.12f, 0.12f), 45f);
         Part(t, "Head", circle, body, 4, new Vector2(0.28f, 0.1f), new Vector2(0.28f, 0.28f));
         Part(t, "Eye", circle, Color.white, 5, new Vector2(0.32f, 0.14f), new Vector2(0.08f, 0.08f));
         Part(t, "Pupil", circle, Color.black, 6, new Vector2(0.335f, 0.14f), new Vector2(0.04f, 0.04f));
@@ -480,6 +578,8 @@ public static class VisualsBuilder
         Transform wingPivot = Container(t, "WingPivot", new Vector2(-0.02f, 0.06f));
         wingPivot.gameObject.AddComponent<Flapper>();
         Part(wingPivot, "Wing", circle, wing, 5, new Vector2(-0.12f, 0.1f), new Vector2(0.42f, 0.14f), 15f);
+
+        AddOutlines(t, 0.05f, 1, false);
 
         var collider = go.AddComponent<CircleCollider2D>();
         collider.isTrigger = true;

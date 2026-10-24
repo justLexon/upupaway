@@ -6,6 +6,8 @@ public class ResourceHUD : MonoBehaviour
 {
     [SerializeField] private Furnace furnace;
     [SerializeField] private TMP_Text coalText;
+    [SerializeField] private TMP_Text milkText;  // optional
+    [SerializeField] private TMP_Text coinText;  // optional
     [SerializeField] private RectTransform heatFill;
     [SerializeField] private Image heatFillImage;
     [SerializeField] private int lowCoal = 3;
@@ -16,9 +18,15 @@ public class ResourceHUD : MonoBehaviour
 
     private void Update()
     {
-        int coal = ResourceManager.Instance.Coal;
-        coalText.text = $"Coal: {coal}";
+        ResourceManager resources = ResourceManager.Instance;
+        int coal = resources.Coal;
+        coalText.text = coal.ToString();
         coalText.color = coal <= lowCoal ? lowTextColor : normalTextColor;
+
+        if (milkText != null)
+            milkText.text = resources.Get(ResourceType.Milk).ToString();
+        if (coinText != null)
+            coinText.text = "$" + resources.Get(ResourceType.Coins);
 
         heatFill.anchorMax = new Vector2(furnace.Heat01, 1f);
         heatFillImage.color = Color.Lerp(coldColor, hotColor, furnace.Heat01);

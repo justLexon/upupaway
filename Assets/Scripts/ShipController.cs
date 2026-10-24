@@ -17,6 +17,7 @@ public class ShipController : MonoBehaviour
     [SerializeField] private float knockbackSpeed = 5f; // m/s down right after a hit
     [SerializeField] private Color hitColor = new Color(1f, 0.3f, 0.3f);
     [SerializeField] private Transform[] jugSlots;      // where milk jugs stick under the ship
+    [SerializeField] private Vector3 soldJugOffset = new Vector3(8.6f, -2.3f, 0f); // sold jugs fly here (the pitstop deck)
 
     public float Altitude { get; private set; }
     public float MaxAltitude { get; private set; }
@@ -27,6 +28,9 @@ public class ShipController : MonoBehaviour
 
     // Set by WindGusts. x = world units/s sideways, y = m/s up/down.
     public Vector2 WindPush { get; set; }
+
+    // Extra sink in m/s from heavy rain, set by WeatherSystem.
+    public float WeatherSink { get; set; }
 
     // Grabbed in Awake, so milk jugs that attach later don't flash.
     private SpriteRenderer[] renderers;
@@ -44,9 +48,49 @@ public class ShipController : MonoBehaviour
             baseColors[i] = renderers[i].color;
     }
 
+    private void Start()
+    {
+        if (ResourceManager.Instance != null)
+            ResourceManager.Instance.OnChanged += HandleResourceChanged;
+    }
+
+    private void OnDestroy()
+    {
+        if (ResourceManager.Instance != null)
+            ResourceManager.Instance.OnChanged -= HandleResourceChanged;
+    }
+
+    // Milk is the jugs on board. If the milk count drops below that (sold at a pitstop), unload the extras.
+    private void HandleResourceChanged(ResourceType type, int amount)
+    {
+        if (type != ResourceType.Milk || jugSlots == null)
+            return;
+
+        int attached = 0;
+        foreach (Transform slot in jugSlots)
+        {
+            MilkJug jug = slot != null ? slot.GetComponentInChildren<MilkJug>() : null;
+            if (jug != null && jug.IsAttached)
+                attached++;
+        }
+
+        for (int i = jugSlots.Length - 1; i >= 0 && attached > amount; i--)
+        {
+            MilkJug jug = jugSlots[i] != null ? jugSlots[i].GetComponentInChildren<MilkJug>() : null;
+            if (jug == null || !jug.IsAttached)
+                continue;
+            jug.Sell(transform.position + soldJugOffset);
+            attached--;
+        }
+    }
+
     private void Update()
     {
-        float targetSpeed = furnace.Heat01 * maxLiftSpeed - sinkSpeed - Weight;
+        // Docked at a pitstop: PitstopManager moves the ship.
+        if (GameManager.Instance != null && GameManager.Instance.IsPaused)
+            return;
+
+        float targetSpeed = furnace.Heat01 * maxLiftSpeed - sinkSpeed - Weight - WeatherSink;
         VerticalSpeed = Mathf.MoveTowards(VerticalSpeed, targetSpeed, acceleration * Time.deltaTime);
 
         Altitude += (VerticalSpeed + WindPush.y) * Time.deltaTime;
