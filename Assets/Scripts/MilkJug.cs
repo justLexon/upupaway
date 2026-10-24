@@ -7,6 +7,7 @@ public class MilkJug : Obstacle, IClickable
     [SerializeField] private int tapsToRemove = 1;
     [SerializeField] private float fallSpeed = 8f;      // world units/s after being knocked off
     [SerializeField] private float fallSpin = 360f;     // degrees/s while falling
+    [SerializeField] private GameObject balloon;        // pops when the jug sticks to the ship
 
     private bool attached;
     private int taps;
@@ -24,6 +25,9 @@ public class MilkJug : Obstacle, IClickable
         attached = true;
         Frozen = true;
         owner = ship;
+
+        if (balloon != null)
+            Destroy(balloon);
 
         // Keep the jug's on-screen size even though the ship is scaled non-uniformly.
         Vector3 worldScale = transform.lossyScale;

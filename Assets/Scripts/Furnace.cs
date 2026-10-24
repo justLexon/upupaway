@@ -15,6 +15,7 @@ public class Furnace : MonoBehaviour, IClickable
     public float Heat { get; private set; }
     public float MaxHeat => maxHeat;
     public float Heat01 => Heat / maxHeat;
+    public event System.Action OnCoalAdded;
 
     private Vector3 baseScale;
     private Coroutine pulseRoutine;
@@ -58,6 +59,7 @@ public class Furnace : MonoBehaviour, IClickable
             return;
 
         Heat = Mathf.Min(maxHeat, Heat + heatPerCoal);
+        OnCoalAdded?.Invoke();
 
         if (pulseRoutine != null)
             StopCoroutine(pulseRoutine);

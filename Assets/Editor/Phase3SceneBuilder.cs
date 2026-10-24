@@ -67,8 +67,8 @@ public static class Phase3SceneBuilder
         Assign(ship, "wheel", wheelComp);
 
         // Prefabs
-        Bird birdPrefab = CreateBirdPrefab(square);
-        AltitudeObject puffPrefab = CreateSkyPuffPrefab(square);
+        Bird birdPrefab = VisualsBuilder.CreateBirdPrefab();
+        AltitudeObject puffPrefab = VisualsBuilder.CreateSkyPuffPrefab();
 
         // Spawners: one for obstacles, one for background puffs that make climbing feel like movement.
         ObstacleSpawner obstacleSpawner = managers.AddComponent<ObstacleSpawner>();
@@ -80,29 +80,10 @@ public static class Phase3SceneBuilder
         Assign(decorSpawner, "ship", ship);
         Assign(decorSpawner, "spawnParent", outsideZone.transform);
         SetSpawnEntries(decorSpawner, (puffPrefab, 1f));
-        SetFloat(decorSpawner, "minSpacing", 8f);
-        SetFloat(decorSpawner, "maxSpacing", 15f);
+        SetFloat(decorSpawner, "minSpacing", 12f);
+        SetFloat(decorSpawner, "maxSpacing", 22f);
         SetFloat(decorSpawner, "xLimit", 9f);
 
         return true;
-    }
-
-    private static Bird CreateBirdPrefab(Sprite square)
-    {
-        GameObject go = CreateSprite("Bird", square, new Color(0.15f, 0.15f, 0.2f), 3);
-        go.transform.rotation = Quaternion.Euler(0f, 0f, 45f);
-        go.transform.localScale = new Vector3(0.6f, 0.6f, 1f);
-        go.AddComponent<BoxCollider2D>().isTrigger = true;
-        go.AddComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Kinematic;
-        go.AddComponent<Bird>();
-        return SavePrefab(go).GetComponent<Bird>();
-    }
-
-    private static AltitudeObject CreateSkyPuffPrefab(Sprite square)
-    {
-        GameObject go = CreateSprite("SkyPuff", square, new Color(1f, 1f, 1f, 0.5f), -5);
-        go.transform.localScale = new Vector3(1.5f, 0.6f, 1f);
-        go.AddComponent<AltitudeObject>();
-        return SavePrefab(go).GetComponent<AltitudeObject>();
     }
 }

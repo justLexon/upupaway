@@ -25,8 +25,12 @@ public class ShipController : MonoBehaviour
     // Extra sink in m/s from milk jugs.
     public float Weight { get; private set; }
 
-    private SpriteRenderer spriteRenderer;
-    private Color baseColor;
+    // Set by WindGusts. x = world units/s sideways, y = m/s up/down.
+    public Vector2 WindPush { get; set; }
+
+    // Grabbed in Awake, so milk jugs that attach later don't flash.
+    private SpriteRenderer[] renderers;
+    private Color[] baseColors;
     private Coroutine flashRoutine;
 
     private void Awake()
@@ -34,9 +38,10 @@ public class ShipController : MonoBehaviour
         Altitude = startingAltitude;
         MaxAltitude = startingAltitude;
 
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        if (spriteRenderer != null)
-            baseColor = spriteRenderer.color;
+        renderers = GetComponentsInChildren<SpriteRenderer>();
+        baseColors = new Color[renderers.Length];
+        for (int i = 0; i < renderers.Length; i++)
+            baseColors[i] = renderers[i].color;
     }
 
     private void Update()
@@ -44,14 +49,18 @@ public class ShipController : MonoBehaviour
         float targetSpeed = furnace.Heat01 * maxLiftSpeed - sinkSpeed - Weight;
         VerticalSpeed = Mathf.MoveTowards(VerticalSpeed, targetSpeed, acceleration * Time.deltaTime);
 
-        Altitude += VerticalSpeed * Time.deltaTime;
+        Altitude += (VerticalSpeed + WindPush.y) * Time.deltaTime;
         MaxAltitude = Mathf.Max(MaxAltitude, Altitude);
 
         float steer = wheel != null ? wheel.SteerInput : 0f;
+        float sideSpeed = steer * maxSideSpeed + WindPush.x;
         Vector3 position = transform.position;
-        position.x = Mathf.Clamp(position.x + steer * maxSideSpeed * Time.deltaTime, -xLimit, xLimit);
+        position.x = Mathf.Clamp(position.x + sideSpeed * Time.deltaTime, -xLimit, xLimit);
         transform.position = position;
-        transform.rotation = Quaternion.Euler(0f, 0f, -steer * maxTilt);
+
+        // Lean into the movement, wind included.
+        float lean = Mathf.Clamp(sideSpeed / maxSideSpeed, -1.5f, 1.5f);
+        transform.rotation = Quaternion.Euler(0f, 0f, -lean * maxTilt);
     }
 
     public void Knockback(float meters)
@@ -59,7 +68,7 @@ public class ShipController : MonoBehaviour
         Altitude -= meters;
         VerticalSpeed = Mathf.Min(VerticalSpeed, -knockbackSpeed);
 
-        if (spriteRenderer == null)
+        if (renderers.Length == 0)
             return;
 
         if (flashRoutine != null)
@@ -96,9 +105,11 @@ public class ShipController : MonoBehaviour
 
     private IEnumerator Flash()
     {
-        spriteRenderer.color = hitColor;
+        for (int i = 0; i < renderers.Length; i++)
+            renderers[i].color = baseColors[i] * hitColor;
         yield return new WaitForSeconds(0.15f);
-        spriteRenderer.color = baseColor;
+        for (int i = 0; i < renderers.Length; i++)
+            renderers[i].color = baseColors[i];
         flashRoutine = null;
     }
 }

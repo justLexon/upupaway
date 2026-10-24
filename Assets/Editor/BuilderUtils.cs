@@ -39,35 +39,72 @@ public static class BuilderUtils
 
     public static Sprite SquareSprite() => AssetDatabase.LoadAssetAtPath<Sprite>(SquareSpritePath);
 
-    public static Sprite GetOrCreateCircleSprite()
+    public static Sprite GetOrCreateCircleSprite() => GetOrCreateRoundSprite(CircleSpritePath, 0f);
+
+    // A circle with a hole in the middle; innerRatio is the hole's size relative to the whole.
+    public static Sprite GetOrCreateRingSprite() => GetOrCreateRoundSprite(RingSpritePath, 0.78f);
+
+    public const string RingSpritePath = "Assets/Sprites/Ring.png";
+
+    private static Sprite GetOrCreateRoundSprite(string path, float innerRatio)
     {
-        if (!File.Exists(CircleSpritePath))
+        if (!File.Exists(path))
         {
-            const int size = 64;
+            const int size = 128;
             var tex = new Texture2D(size, size);
             float radius = size / 2f;
+            float innerRadius = radius * innerRatio;
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
                 {
                     float distance = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(radius, radius));
                     float alpha = Mathf.Clamp01(radius - distance); // 1px soft edge
+                    if (innerRatio > 0f)
+                        alpha = Mathf.Min(alpha, Mathf.Clamp01(distance - innerRadius));
                     tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
                 }
             }
-            Directory.CreateDirectory(Path.GetDirectoryName(CircleSpritePath));
-            File.WriteAllBytes(CircleSpritePath, tex.EncodeToPNG());
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllBytes(path, tex.EncodeToPNG());
             Object.DestroyImmediate(tex);
-            AssetDatabase.ImportAsset(CircleSpritePath);
+            AssetDatabase.ImportAsset(path);
 
-            var importer = (TextureImporter)AssetImporter.GetAtPath(CircleSpritePath);
+            var importer = (TextureImporter)AssetImporter.GetAtPath(path);
             importer.textureType = TextureImporterType.Sprite;
             importer.spriteImportMode = SpriteImportMode.Single;
             importer.spritePixelsPerUnit = size; // 1 world unit across
             importer.alphaIsTransparency = true;
             importer.SaveAndReimport();
         }
-        return AssetDatabase.LoadAssetAtPath<Sprite>(CircleSpritePath);
+        return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
+    // A child sprite positioned in its parent's local space. Used to compose art from simple shapes.
+    public static GameObject Part(Transform parent, string name, Sprite sprite, Color color, int sortingOrder,
+        Vector2 position, Vector2 scale, float rotation = 0f)
+    {
+        GameObject go = CreateSprite(name, sprite, color, sortingOrder);
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = position;
+        go.transform.localScale = new Vector3(scale.x, scale.y, 1f);
+        go.transform.localRotation = Quaternion.Euler(0f, 0f, rotation);
+        return go;
+    }
+
+    public static Transform Container(Transform parent, string name, Vector2 position = default)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = position;
+        return go.transform;
+    }
+
+    public static void DestroyChild(Transform parent, string name)
+    {
+        Transform child = parent.Find(name);
+        if (child != null)
+            Object.DestroyImmediate(child.gameObject);
     }
 
     public static GameObject CreateSprite(string name, Sprite sprite, Color color, int sortingOrder)

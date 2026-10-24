@@ -67,7 +67,7 @@ public static class Phase4SceneBuilder
         shipSo.ApplyModifiedPropertiesWithoutUndo();
 
         // Prefabs + spawner mix
-        MilkJug jugPrefab = CreateMilkJugPrefab(square);
+        MilkJug jugPrefab = VisualsBuilder.CreateMilkJugPrefab();
         ResourceBalloon balloonPrefab = CreateBalloonPrefab(square, circle);
         Bird birdPrefab = AssetDatabase.LoadAssetAtPath<Bird>(PrefabFolder + "/Bird.prefab");
 
@@ -101,22 +101,6 @@ public static class Phase4SceneBuilder
             }
         }
         return null;
-    }
-
-    private static MilkJug CreateMilkJugPrefab(Sprite square)
-    {
-        GameObject go = CreateSprite("MilkJug", square, new Color(0.97f, 0.97f, 0.95f), 4);
-        go.transform.localScale = new Vector3(0.3f, 0.45f, 1f);
-
-        GameObject cap = CreateSprite("Cap", square, new Color(0.2f, 0.45f, 0.9f), 5);
-        cap.transform.SetParent(go.transform, false);
-        cap.transform.localPosition = new Vector3(0f, 0.55f, 0f);
-        cap.transform.localScale = new Vector3(0.6f, 0.2f, 1f);
-
-        go.AddComponent<BoxCollider2D>().isTrigger = true;
-        go.AddComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Kinematic;
-        go.AddComponent<MilkJug>();
-        return SavePrefab(go).GetComponent<MilkJug>();
     }
 
     private static ResourceBalloon CreateBalloonPrefab(Sprite square, Sprite circle)
