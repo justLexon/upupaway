@@ -9,9 +9,15 @@ public class Bird : Obstacle
     [SerializeField] private float maxClimbSpeed = 8f;                 // m/s up or down while wandering
     [SerializeField] private float wanderFrequency = 0.5f;             // how often it changes vertical direction
 
+    // Birds currently in the sky (for the bird ambience).
+    public static int ActiveCount { get; private set; }
+
     private float speed;
     private float direction;
     private float noiseSeed;
+
+    private void OnEnable() => ActiveCount++;
+    private void OnDisable() => ActiveCount--;
 
     private void Start()
     {

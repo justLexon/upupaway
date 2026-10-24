@@ -38,6 +38,9 @@ public class WeatherSystem : MonoBehaviour
     public float StormIntensity { get; private set; }
     public bool IsStorming => StormIntensity > 0.5f;
 
+    // Fired on every lightning strike; true if it hit the ship.
+    public event System.Action<bool> OnLightning;
+
     private bool stormTonight;
     private float nextLightning;
     private SpriteRenderer[] rain;
@@ -123,6 +126,7 @@ public class WeatherSystem : MonoBehaviour
 
         if (hit)
             ship.Knockback(lightningKnockback);
+        OnLightning?.Invoke(hit);
     }
 
     // A zigzag of stretched squares (plus a wider glow) that fades out.

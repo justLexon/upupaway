@@ -138,19 +138,12 @@ public static class HudBuilder
         panel.anchoredPosition = new Vector2(-20f, -20f);
         panel.sizeDelta = new Vector2(290f, 214f);
 
+        // Same pixel art as in the world.
         TextMeshProUGUI coal = Row(panel, "Coal", 0);
-        Knob("IconOutline", coal.transform.parent, ArtPalette.Ink, new Vector2(30f, 0f), new Vector2(30f, 26f));
-        Knob("Icon", coal.transform.parent, ArtPalette.Iron, new Vector2(30f, 0f), new Vector2(26f, 22f));
+        PixelIcon(coal.transform.parent, VisualsBuilder.CoalSprite, new Vector2(30f, 0f), new Vector2(34f, 32f));
 
         TextMeshProUGUI milk = Row(panel, "Milk", 1);
-        RectTransform jugOutline = Box("IconOutline", milk.transform.parent, ArtPalette.Ink);
-        AnchorLeft(jugOutline, new Vector2(30f, -3f), new Vector2(20f, 26f));
-        RectTransform jug = Box("Icon", milk.transform.parent, ArtPalette.Cream);
-        AnchorLeft(jug, new Vector2(30f, -3f), new Vector2(16f, 22f));
-        RectTransform cap = Box("Cap", jug, new Color(0.2f, 0.45f, 0.9f)); // same blue cap as the jugs in the sky
-        cap.anchorMin = cap.anchorMax = new Vector2(0.5f, 1f);
-        cap.anchoredPosition = new Vector2(0f, 3f);
-        cap.sizeDelta = new Vector2(10f, 6f);
+        PixelIcon(milk.transform.parent, VisualsBuilder.MilkBottleSprite, new Vector2(30f, 0f), new Vector2(18f, 35f));
 
         TextMeshProUGUI coins = Row(panel, "Coins", 2);
         Knob("IconOutline", coins.transform.parent, ArtPalette.Ink, new Vector2(30f, 0f), new Vector2(28f, 28f));
@@ -232,6 +225,15 @@ public static class HudBuilder
         image.sprite = sprite;
         image.type = UnityEngine.UI.Image.Type.Sliced;
         return rect;
+    }
+
+    private static void PixelIcon(Transform row, Sprite sprite, Vector2 position, Vector2 size)
+    {
+        RectTransform rect = Box("Icon", row, Color.white);
+        Image image = rect.GetComponent<Image>();
+        image.sprite = sprite;
+        image.preserveAspect = true;
+        AnchorLeft(rect, position, size);
     }
 
     private static void Knob(string name, Transform parent, Color color, Vector2 position, Vector2 size)
